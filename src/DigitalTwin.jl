@@ -1,23 +1,35 @@
 module DigitalTwin
 
+#Export necessary packages for integrating physiological data
 using ElectroPhysiology #This is for opening data
-using DifferentialEquations
+export getStimulusStartTime, getStimulusEndTime
 
+#Export necessary packages for modeling
+using DifferentialEquations
+export solve, ODEProblem, Tsit5
+
+#Export basic optimization packages
 using Optimization
 export OprimizationProblem
 
+#Export some more specialized optimization packages
 using OptimizationBBO, OptimizationPRIMA, OptimizationOptimJL
 export BBO_adaptive_de_rand_1_bin_radiuslimited, PRIMA, COBYLA, OptimizationOptimJL
 
 using DiffEqParamEstim #This is for parameter estimation
+using SciMLSensitivity #This is for sensitivity analysis
 
+#Use some statistics packages
 using Statistics
 
-
+#When parameters have been found, save their results
 using DataFrames, CSV
+
+#Export some basic plotting packages
 using GLMakie, PhysiologyPlotting
 
 include("OpenData.jl")
+export openData
 
 include("AuxillaryFunctions.jl")
 export Stim
