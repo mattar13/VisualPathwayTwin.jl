@@ -1,3 +1,29 @@
+function photoreceptor_model!(du, u, p, t; stim_start = 0.0, stim_end = 1.0, photon_flux = 400.0)
+    dV = view(du, 1)
+    dRh = view(du, 2)
+    dRhi = view(du, 3)
+    dTr = view(du, 4)
+    dPDE = view(du, 5)
+    dCa = view(du, 6)
+    dCaB = view(du, 7)
+    dcGMP = view(du, 8)
+
+    V = view(u, 1)
+    Rh = view(u, 2)
+    Rhi = view(u, 3)
+    Tr = view(u, 4)
+    PDE = view(u, 5)
+    Ca = view(u, 6)
+    CaB = view(u, 7)
+    cGMP = view(u, 8)
+
+    #Extract the parameters
+    (αC, ) = p
+    dRh = aC*Stim(t, stim_start, stim_end, photon_flux) 
+end
+
+
+
 function phototransduction_ode!(du, u, p, t; stim_start = 0.0, stim_end = 1.0, photon_flux = 400.0)
     #Extract the parameters
     dR = view(du, 1)
