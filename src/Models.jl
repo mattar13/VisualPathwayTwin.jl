@@ -5,7 +5,7 @@ function phototransduction_ode!(du, u, p, t; stim_start = 0.0, stim_end = 1.0, p
     dP = view(du, 3)
     dG = view(du, 4)
     dJ = view(du, 5)
-    dH = view(du, 6)
+    dV = view(du, 6)
 
     dA = view(du, 7)
 
@@ -14,29 +14,27 @@ function phototransduction_ode!(du, u, p, t; stim_start = 0.0, stim_end = 1.0, p
     P = view(u, 3)
     G = view(u, 4)
     J = view(u, 5)
-    H = view(u, 6)
+    V = view(u, 6)
 
     A = view(u, 7)
 
-    #CONSTANTS
-    RMAX = 1.0
-    TMAX = 1.0
-    PMAX = 1.0
-    GMAX = 1.0
-
     #Open parameters
-    (kP1, kP2, kP3, kP4, kP5, kP6,
-    l1, h1, JMAX, HMAX,
-    τR, τT, τP, τG, τJ, τH) = p
+    (
+        k, μRh, kACT, μTr, μPDE, μcGMP, V0,
+        C_m, gPHOTO, kg, gL, EL
+    ) = p
+    C_m = 20.0
 
-    @. dR = kP1*Stim(t, stim_start, stim_end, photon_flux)*(1-R/RMAX) - R/τR
-    @. dT = kP2*R*(1-T/TMAX)- T/τT
-    @. dP = kP3*T*(1-P/PMAX) - P/τP
-    @. dG = -kP4*P*(1-G/-GMAX) - G/τG # Non-linear degradation
-    @. dJ = ( kP5*G*(1-J/-JMAX) - J)/τJ
-    @. dH = (kP6*H_inf(J, l1, h1)^2*(1-H/ HMAX) - H)/τH #to add this or not *H_inf(J, l1, h1)
+    Φ = Stim(t, stim_start, stim_end, photon_flux)
+    @. dR = k*Φ*(1-R) - μRh*R
+    @. dT = kACT*R*(1-T) - μTr*T 
+    @. dP = μTr*T*(1-P) - μPDE*P 
+    @. dG = (V0 - G) - (μPDE+μcGMP)*P*G# - μcGMP*G # Non-linear degradation
 
-    @. dA = (J+H) - A
+    @. dJ = -gPHOTO*J∞(G, kg)-J#*(1.0-exp((V-8.5)/17.0)) - J# # - iDARK
+    @. dV = -(I_LEAK(V, gL, -EL) + J)/C_m #(kP6*H_inf(J, l1, h1)^2*(1-H/ HMAX) - H)/τH #to add this or not *H_inf(J, l1, h1)
+
+    @. dA = 0.0#(J+H) - A
     return nothing
 end
 
@@ -129,8 +127,8 @@ function make_model_photo(data, params; ex_vivo = true, kwargs...)
     return prob
 end
 
-function simulate_model_photo(data, params; kwargs...)
-    prob = make_model_photo(data, params; kwargs...)
+function simulate_model_photo(data, params; stim_start = 0.0, stim_end = 1.0, kwargs...)
+    prob = make_model_photo(data, params; stim_start = stim_start, stim_end = stim_end, kwargs...)
     sol = solve(prob, Tsit5(), saveat=data.t, tstops=[stim_start, stim_end])
 	ERG_t = map(t -> sol(t)[7], data.t)
     return sol, ERG_t
