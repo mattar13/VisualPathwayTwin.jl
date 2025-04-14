@@ -4,24 +4,39 @@ function phototransduction_ode!(du, u, p, t; stim_start = 0.0, stim_end = 1.0, p
     dT = view(du, 2)
     dP = view(du, 3)
     dG = view(du, 4)
-    dIPHOTO = view(du, 5)
+    dJ = view(du, 5)
+    dH = view(du, 6)
+
+    dA = view(du, 7)
 
     R = view(u, 1)
     T = view(u, 2)
     P = view(u, 3)
     G = view(u, 4)
-    IPHOTO = view(u, 5)
+    J = view(u, 5)
+    H = view(u, 6)
+
+    A = view(u, 7)
 
     #Open parameters
-    (k, μRh, kACT, μTr, μPDE, μcGMP, V0, gPHOTO, kg) = p
+    (aC, kR1, kF2, kR2, kF3, kR3,
+    kHYDRO, kREC, G0, 
 
-    Φ = Stim(t, stim_start, stim_end, photon_flux)
-    @. dR = k*Φ*(1-R) - μRh*R
-    @. dT = kACT*R*(1-T) - μTr*T 
-    @. dP = μTr*T*(1-P) - μPDE*P 
-    @. dG = (V0 - G) - (μPDE+μcGMP)*P*G# - μcGMP*G # Non-linear degradation
+    iDARK, kg, C_m,
+    V0, gREST, l1, h1,
+    gH, τH) = p
 
-    @. dIPHOTO = -gPHOTO*J∞(G, kg)-IPHOTO#*(1.0-exp((V-8.5)/17.0)) - J# # - iDARK
+    Φ=Stim(t, stim_start, stim_end, photon_flux)
+    @. dR = aC*Φ - kR1*R
+    @. dT = kF2*R*(1-T) - kR2*T
+    @. dP = kF3*T*(1-P) - kR3*P
+    @. dG = -kHYDRO*P*G + kREC*(G0 - G) # Non-linear degradation
+
+    @. dJ = -iDARK * J∞(G, kg) - J#( kP5*G*(1-J/-JMAX) - J)/τJ
+    @. dH = (gH*H_inf(A, l1, h1)*(A-0.25) - H)/τH #0.0#(kP6*H_inf(J, l1, h1)^2*(1-H/ HMAX) - H)/τH #to add this or not *H_inf(J, l1, h1)
+    R_m = 10
+    E_REST = 0.0
+    @. dA = -((J+V0)/R_m + H + gREST*(A-E_REST))/C_m 
     return nothing
 end
 
@@ -59,7 +74,7 @@ function erg_ode!(du, u, p, t; stim_start = 0.0, stim_end = 1.0, photon_flux = 4
     #Run phototransduction first
     phototransduction_ode!(du, u, photo_p, t; stim_start = stim_start, stim_end = stim_end, photon_flux = photon_flux)
 
-    @. dB = (-k1*B_inf(A, l2, h2) - B)/τB #This is transfer from PC to BPC #*(-A^3) This nonlinear term may be taking away
+    @. dB = k1*(abs(A)^4) - B/τB #This is transfer from PC to BPC #*(-A^3) This nonlinear term may be taking away
     @. dM = (k2*A - k3*B - M)/τM
     @. dC = (-k4*A - C)/τC 
     
@@ -69,7 +84,7 @@ function erg_ode!(du, u, p, t; stim_start = 0.0, stim_end = 1.0, photon_flux = 4
     @. dO3 = (-k7*B*abs(O2) - O3)/τO
     @. dO = (O3 * O2) - O
 
-    @. dERG = (A + B + M + C + O) - ERG
+    @. dERG = (A + B + M) - ERG # + C + O
     nothing
 end
 
@@ -82,7 +97,8 @@ function make_model(data, params; ex_vivo = true, stim_start = 0.0, stim_end = 1
             0.0
         ]
 
-    
+    u0[4] = 4.0
+    u0[5] = -40.0
     if ex_vivo
         params[22] = 0.0 #Silence k4 
         params[25] = 0.0 #Silence k7
