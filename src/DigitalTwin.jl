@@ -15,8 +15,8 @@ export OprimizationProblem
 
 #Export some more specialized optimization packages
 using OptimizationBBO, OptimizationPRIMA, OptimizationOptimJL
-export BBO_adaptive_de_rand_1_bin_radiuslimited, PRIMA, COBYLA, OptimizationOptimJL
-
+export BBO_adaptive_de_rand_1_bin_radiuslimited, PRIMA, BOBYQA, COBYLA, OptimizationOptimJL
+export OptimizationFunction, OptimizationProblem, AutoForwardDiff
 using SciMLSensitivity #This is for sensitivity analysis
 
 #Use some statistics packages
