@@ -44,14 +44,6 @@ mKCas(_Ca_s) = _Ca_s / (_Ca_s + 0.3)
 #Calcium activated chloride
 mCl(_Ca_s) = 1 / (1 + exp((0.37 - _Ca_s) / 0.9))
 
-#Calcium activated potassium
-αmKCa(v) = (15 * (80 - v)) / (exp((80 - v) / 40) - 1)
-βmKCa(v) = 20 * exp(-v / 35)
-mKCas(_Ca_s) = _Ca_s / (_Ca_s + 0.3)
-
-#Hyperpolarising current
-αh(v) = 8 / (exp((v + 78) / 14) + 1)
-βh(v) = 18 / (exp(-(v + 9) / 19) + 1)
 
 #Hyperpolarising current
 αh(v) = 8 / (exp((v + 78) / 14) + 1)
