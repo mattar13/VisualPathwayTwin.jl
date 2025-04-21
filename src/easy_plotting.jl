@@ -1,5 +1,5 @@
 #Model imports
-import DigitalTwin: hCa, mCl, mKCas, J∞
+import DigitalTwin: hCa, mCl, mKCas, J∞, C∞
 
 #Plotting Figure 1 phototransduction
 fig1 = Figure(size = (1200, 600), title = "Phototransduction model")
@@ -16,7 +16,7 @@ for (i, sol) in enumerate(data_series)
     T_t = map(t -> sol(t)[3], t_rng)
     P_t = map(t -> sol(t)[4], t_rng)
     G_t = map(t -> sol(t)[5], t_rng)
-    iPHOTO = @. -iDARK * J∞(G_t, kg)* (1.0 - exp((V_t - 8.5) / 17.0))
+    iPHOTO = @. -iDARK * J∞(G_t, kg) * (1.0 - exp((V_t - 8.5) / 17.0))
 
     vlines!(ax1a, [stim_start, stim_end], (-0.5, 1.0), color = :black, alpha = 0.2)
     lines!(ax1a, t_rng, R_t,         
@@ -47,8 +47,9 @@ for (i, sol) in enumerate(data_series)
         color = round(log10(photon_range[i])), colormap = :viridis, 
         colorrange = (0.0, 3.0), label = "A-wave")
 end
+fig1
 
-# Make a second figure to show the gating of J
+#%% Make a second figure to show the gating of J
 fig2 = Figure(size = (1200, 600), title = "Electrical Equivalence Circuit")
 ax1 = Axis(fig2[1:2, 1], title = "V_t"); hidespines!(ax1)
 ax2a = Axis(fig2[1, 2], title = "iPHOTO"); hidespines!(ax2a)
@@ -61,13 +62,13 @@ ax3c = Axis(fig2[2, 4], title = "iCl"); hidespines!(ax2c)
 
 ax4a = Axis(fig2[3, 2], title = "iEX"); hidespines!(ax4a)
 ax4b = Axis(fig2[3, 3], title = "iEX2"); hidespines!(ax4b)
-ax4c = Axis(fig2[3, 4], title = "Ca_flux_elec"); hidespines!(ax4c)
-ax4d = Axis(fig2[3, 5], title = "Ca_flux_pump"); hidespines!(ax4d)
+ax4c = Axis(fig2[3, 4], title = "Ca_flux"); hidespines!(ax4c)
+ax4d = Axis(fig2[3, 5], title = "[Ca]s"); hidespines!(ax4d)
 
 for (i, sol) in enumerate(data_series)
 
     V_t = map(t -> sol(t)[1], t_rng) #This is the voltage equation, but we are not using it in this model
-    Gt = map(t -> sol(t)[5], t_rng)
+    G_t = map(t -> sol(t)[5], t_rng)
     _Ca_s = map(t -> sol(t)[15], t_rng)
     O1 = map(t -> sol(t)[6], t_rng)
     O2 = map(t -> sol(t)[7], t_rng)
@@ -77,18 +78,28 @@ for (i, sol) in enumerate(data_series)
     mCa = map(t -> sol(t)[13], t_rng)
     mKCa = map(t -> sol(t)[14], t_rng)
     #Open parameters
+    V = V_t
+    G = G_t
 
-    iPHOTO = @. -iDARK * J∞(Gt, kg)#* (1.0 - exp((V_t - 8.5) / 17.0))
-    iLEAK = @. gLEAK*(V_t+eLEAK) #Leak
-    iH =  @. gH*(O1 + O2 + O3)*(V_t + eH) #Ih Current
-    iKV =  @. gKV*mKV^3+hKV*(V_t + eK)
-    iCa =  @. gCa*mCa^4*hCa(V_t)*(V_t + eCa) #Ca current #We should add the log
-    iKCa =  @. gKCa * mKCa^2 * mKCas(_Ca_s) * (V_t + eK) #KCa current
-    iCl = @. gCl * mCl(_Ca_s) * (V_t + eCl) #Cl current
-    iEX = @. J_ex * exp(-(V_t - 14) / 70) * (_Ca_s - Cae) / (_Ca_s - Cae + K_ex)
-    iEX2 = @. J_ex2 * (_Ca_s - Cae) / (_Ca_s - Cae + K_ex2)
-    Ca_flux_elec = @. -iCa / (2F*V1) * 1e-6      # µM s⁻¹  (electrogenic)
-    Ca_flux_pump = @. -(iEX + iEX2) / (2F*V1) * 1e-6   # export µM s⁻¹
+    #Reversal potentials (- sign only once) -------------
+    E_LEAK   = -eLEAK
+    E_H   = -eH
+    E_K   = -eK
+    E_Cl  = -eCl
+    E_Ca =  @. eCa * log(_Ca_0 / max(_Ca_s, 1e-5)) 
+    
+    #Currents
+    iLEAK = iH = iKV = iCa = iKCa = iCl = iEX = iEX2 = 0.0 #Initialize the currents to zero
+    iPHOTO = @. -iDARK * J∞(G, 10.0) * (1.0 - exp((V - 8.5) / 17.0))
+    iLEAK = @. gLEAK*(V - E_LEAK) #Leak
+    iH =    @. gH*(O1 + O2 + O3)*(V - E_H) #Ih Current
+    iKV =   @. gKV*mKV^3*hKV*(V - E_K)
+    iCa =   @. gCa*mCa^4*hCa(V)*(V - E_Ca) #Ca current #We should add the log 
+    iKCa =  @. gKCa * mKCa^2 * mKCas(_Ca_s) * (V - E_K) #KCa current
+    iCl =   @. gCl * mCl(_Ca_s) * (V - E_Cl) #Cl current
+    iEX =   @. J_ex * C∞(_Ca_s, Cae, K_ex) * exp(-(V + 14) / 70)
+    iEX2 =  @. J_ex2 * C∞(_Ca_s, Cae, K_ex2)
+    Ca_flux = (iCa + iEX + iEX2) / (2F*V1) * 1e-6   # export µM s⁻¹
 
     lines!(ax2a, t_rng, iPHOTO,     
         color = round(log10(photon_range[i])), colormap = :viridis, 
@@ -126,11 +137,11 @@ for (i, sol) in enumerate(data_series)
         color = round(log10(photon_range[i])), colormap = :viridis, 
         colorrange = (0.0, 3.0))
 
-    lines!(ax4c, t_rng, Ca_flux_elec,     
+    lines!(ax4c, t_rng, Ca_flux,     
         color = round(log10(photon_range[i])), colormap = :viridis, 
         colorrange = (0.0, 3.0))
 
-    lines!(ax4d, t_rng, Ca_flux_pump,     
+    lines!(ax4d, t_rng, _Ca_s,     
         color = round(log10(photon_range[i])), colormap = :viridis, 
         colorrange = (0.0, 3.0))
 
@@ -138,10 +149,15 @@ for (i, sol) in enumerate(data_series)
         color = round(log10(photon_range[i])), colormap = :viridis, 
         colorrange = (0.0, 3.0))
 end
+fig2
+
+#%%
 
 fig3 = Figure(size = (1200, 600))
-ax1 = Axis(fig3[1, 1], title = "Ca_s"); hidespines!(ax1)
-ax2 = Axis(fig3[1, 2], title = "Ca_f"); hidespines!(ax2)
+ax1 = Axis(fig3[1, 1], title = "[Ca]s"); hidespines!(ax1)
+ax2 = Axis(fig3[1, 2], title = "[Ca]f"); hidespines!(ax2)
+ax1a = Axis(fig3[1, 3], title = "[Ca]total"); hidespines!(ax1a)
+
 ax3 = Axis(fig3[2, 1], title = "CaB_ls"); hidespines!(ax3)
 ax4 = Axis(fig3[3, 1], title = "CaB_hs"); hidespines!(ax4)
 ax5 = Axis(fig3[2, 2], title = "CaB_lf"); hidespines!(ax5)
@@ -161,6 +177,11 @@ for (i, sol) in enumerate(data_series)
     lines!(ax2, t_rng, CaF_t,     
         color = round(log10(photon_range[i])), colormap = :viridis, 
         colorrange = (0.0, 3.0))
+
+    lines!(ax1a, t_rng, CaF_t.+CaS_t,     
+        color = round(log10(photon_range[i])), colormap = :viridis, 
+        colorrange = (0.0, 3.0))
+
     lines!(ax3, t_rng, CaB_ls_t,     
         color = round(log10(photon_range[i])), colormap = :viridis, 
         colorrange = (0.0, 3.0))
@@ -174,3 +195,23 @@ for (i, sol) in enumerate(data_series)
         color = round(log10(photon_range[i])), colormap = :viridis, 
         colorrange = (0.0, 3.0))
 end
+fig3
+
+#%%
+fig_aux = Figure(size = (1200, 600), title = "Auxillary functions")
+ax1 = Axis(fig_aux[1, 1], title = "J∞"); hidespines!(ax1)
+ax2 = Axis(fig_aux[1, 2], title = "C∞"); hidespines!(ax2)
+
+GMP_rng = LinRange(0.0, 4.0, 1000)
+Ca_rng = LinRange(0.0, 4.0, 1000)
+J_rng = map(x -> J∞(x, kg), GMP_rng)
+C_rng = map(x -> C∞(x, Cae, K_ex), Ca_rng)
+
+lines!(ax1, GMP_rng, J_rng, color = :black, label = "J∞")
+lines!(ax2, Ca_rng, C_rng, color = :black, label = "C∞")
+ax1.xlabel = "GMP"
+ax2.xlabel = "Ca"
+ax1.ylabel = "J∞"
+ax2.ylabel = "C∞"
+ax1.title = "J∞"
+ax2.title = "C∞"
