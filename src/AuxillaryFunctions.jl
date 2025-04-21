@@ -1,7 +1,7 @@
 # ------------------------------------------------------------------
 # 1.  Stimulus and phototransduction helpers
 # ------------------------------------------------------------------
-Stim(t, t_on, t_off, Φ) = (t_on <= t <= t_off ? Φ : 0.0)
+Stim(t, t_on, t_off, Φ; hold = 0) = (t_on <= t <= t_off ? Φ : hold)
 
 J∞(g, kg) = g^3 / (g^3 + kg^3)                      # CNG gating
 C∞(C, Cae, K) = C > Cae ? (C - Cae)/(C - Cae + K) : 0.0   # clamp at 0
