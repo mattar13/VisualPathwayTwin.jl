@@ -1,9 +1,12 @@
-# CLAUDE.md -- Retinal Digital Twin Progress Tracker
+# PROGRESS.md -- Retinal Digital Twin Progress Tracker
 
 ## Project: RetinalTwin.jl
 ## Spec: retinal_digital_twin_spec.md
 
 ## Current Phase: Phase 1 -- Core Retinal Column
+
+## Recent Updates
+- 2026-02-09: Added validation helper to compute ERG wave peaks, OP amplitude, and rod hyperpolarization metrics from simulation outputs. Exposed the helper in the module API for downstream workflows.
 
 ## Architecture
 - Julia package: RetinalTwin
