@@ -13,9 +13,9 @@ using CairoMakie
 
 rod_params = default_rod_params()
 
-intensity = 1.0   # photons/µm²/ms (small flash)
-duration  = 5.0   # ms
-t_on      = 5.0  # ms
+intensity = 0.0   # photons/µm²/ms (small flash)
+duration  = 1.0   # ms
+t_on      = 50.0  # ms
 
 stim = flash_stimulus(intensity=intensity, duration=duration, t_on=t_on, background=0.0)
 
@@ -33,7 +33,7 @@ println("Initial rod state (dark adapted): V=$(u0[RetinalTwin.ROD_V_INDEX]) mV, 
 # ── 3. Rod-only ODE ──────────────────────────────────────────
 
 p = (rod_params, stim, 0.0)
-tspan = (0.0, 1200.0)
+tspan = (0.0, 1000.0)
 prob = ODEProblem(rod_rhs!, u0, tspan, p)
 
 println("\nSolving rod-only model...")
