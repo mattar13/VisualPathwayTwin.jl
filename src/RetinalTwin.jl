@@ -43,6 +43,9 @@ include("simulation/run.jl")
 # --- Visualization ---
 include("visualization/plots.jl")
 
+# --- Validation ---
+include("validation/targets.jl")
+
 # --- Public API ---
 export
     # Types
@@ -66,6 +69,8 @@ export
     compute_erg, extract_ops,
     # Visualization
     plot_erg, plot_cell_voltages, plot_ops, plot_intensity_response,
+    # Validation
+    compute_validation_metrics,
     # Utilities
     mean_nt, weighted_mean, synaptic_current,
     hc_feedback, dopamine_gain_factor
