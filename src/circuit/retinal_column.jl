@@ -13,22 +13,36 @@ function dark_adapted_state(col::RetinalColumn, sidx::StateIndex)
     u0 = zeros(sidx.total)
     p = col.pop
 
-    # Rods: dark state — depolarized, tonic glutamate release
+    # Rods: biophysical dark state from docs/rod_photoreceptor_model.md
     for i in 1:p.n_rod
-        offset = sidx.rod[1] + (i - 1) * 6
-        u0[offset]     = 0.0                    # R* = 0 (no light)
-        u0[offset + 1] = col.rod_params.G_dark   # G = G_dark
-        u0[offset + 2] = col.rod_params.Ca_dark  # Ca = Ca_dark
-        u0[offset + 3] = -40.0                  # V ≈ -40 mV (dark)
-        u0[offset + 4] = 0.0                    # h (I_H gate, low in dark)
-        u0[offset + 5] = 0.5                    # Glu ≈ tonic release
+        offset = sidx.rod[1] + (i - 1) * ROD_STATE_VARS
+        u0[offset]      = -36.186   # V
+        u0[offset + 1]  = 0.430     # mKv
+        u0[offset + 2]  = 0.999     # hKv
+        u0[offset + 3]  = 0.436     # mCa
+        u0[offset + 4]  = 0.642     # mKCa
+        u0[offset + 5]  = 0.0966    # Ca_s
+        u0[offset + 6]  = 0.0966    # Ca_f
+        u0[offset + 7]  = 80.929    # Cab_ls
+        u0[offset + 8]  = 29.068    # Cab_hs
+        u0[offset + 9]  = 80.929    # Cab_lf
+        u0[offset + 10] = 29.068    # Cab_hf
+        u0[offset + 11] = 0.0       # Rh
+        u0[offset + 12] = 0.0       # Rhi
+        u0[offset + 13] = 0.0       # Tr
+        u0[offset + 14] = 0.0       # PDE
+        u0[offset + 15] = 0.3       # Ca_photo
+        u0[offset + 16] = 34.88     # Cab_photo
+        u0[offset + 17] = 2.0       # cGMP
+        u0[offset + 18] = rod_glutamate_release(u0[offset], col.rod_params)  # Glu
     end
 
     # Cones: same pattern as rods with cone dark values
+    G_ss_cone = col.cone_params.alpha_G / col.cone_params.beta_G
     for i in 1:p.n_cone
-        offset = sidx.cone[1] + (i - 1) * 6
+        offset = sidx.cone[1] + (i - 1) * CONE_STATE_VARS
         u0[offset]     = 0.0
-        u0[offset + 1] = col.cone_params.G_dark
+        u0[offset + 1] = G_ss_cone               # G = steady-state cGMP
         u0[offset + 2] = col.cone_params.Ca_dark
         u0[offset + 3] = -40.0
         u0[offset + 4] = 0.0
