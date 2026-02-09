@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"c:\\\\Users\\\\mtarc\\\\Julia\\\\dev\\\\VisualPathwayTwin.jl\" status --short)",
+      "Bash(git -C \"c:\\\\Users\\\\mtarc\\\\Julia\\\\dev\\\\VisualPathwayTwin.jl\" log --oneline -20)",
+      "Bash(git -C \"c:\\\\Users\\\\mtarc\\\\Julia\\\\dev\\\\VisualPathwayTwin.jl\" show HEAD:src/Neurons.jl)",
+      "Bash(git -C \"c:\\\\Users\\\\mtarc\\\\Julia\\\\dev\\\\VisualPathwayTwin.jl\" show HEAD:src/CellTypes.jl)",
+      "Bash(git -C \"c:\\\\Users\\\\mtarc\\\\Julia\\\\dev\\\\VisualPathwayTwin.jl\" show HEAD:README.md)",
+      "Bash(git -C \"c:\\\\Users\\\\mtarc\\\\Julia\\\\dev\\\\VisualPathwayTwin.jl\" show HEAD:src/Networks.jl)",
+      "Bash(git -C \"c:\\\\Users\\\\mtarc\\\\Julia\\\\dev\\\\VisualPathwayTwin.jl\" show HEAD:examples/run_simulation.jl)",
+      "Bash(git -C \"c:\\\\Users\\\\mtarc\\\\Julia\\\\dev\\\\VisualPathwayTwin.jl\" show HEAD:ARCHITECTURE.md)",
+      "Bash(git -C \"c:\\\\Users\\\\mtarc\\\\Julia\\\\dev\\\\VisualPathwayTwin.jl\" ls-tree -r HEAD --name-only)",
+      "Bash(git -C \"c:\\\\Users\\\\mtarc\\\\Julia\\\\dev\\\\VisualPathwayTwin.jl\" log --all --oneline)",
+      "Bash(julia -e:*)",
+      "Bash(echo:*)"
+    ]
+  }
+}
