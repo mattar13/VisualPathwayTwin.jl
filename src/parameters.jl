@@ -6,26 +6,29 @@
 # --- Photoreceptors (spec §3.1.4) ---
 
 function default_rod_params()
-    PhototransductionParams(
-        C_m = 20.0, g_L = 2.0, E_L = -70.0,
-        eta = 0.67, tau_R = 80.0,
-        alpha_G = 20.0, beta_G = 0.5, gamma_PDE = 5.0,
-        n_Ca = 4, Ca_dark = 0.3, G_dark = 5.0,
-        n_G = 3.0, g_CNG_max = 20.0, E_CNG = 0.0,
-        f_Ca = 0.12, k_ex = 0.1, B_Ca = 50.0,
-        g_H = 2.0, tau_H = 50.0, V_h_half = -70.0, k_h = -10.0, E_H = -30.0,
-        g_Kv = 3.0, E_K = -84.0,
+    RodPhotoreceptorParams(
+        C_m = 0.02, g_L = 0.35, E_L = -77.0,
+        eta = 0.67,
+        alpha1 = 50.0, alpha2 = 0.0003, alpha3 = 0.03,
+        epsilon = 0.5, beta1 = 2.5, tau1 = 0.2, tau2 = 5.0,
+        T_tot = 1000.0, PDE_tot = 100.0,
+        J_max = 5040.0, b = 0.25, gamma_Ca = 50.0, C0 = 0.1,
+        k1 = 0.2, k2 = 0.8, eT = 500.0,
+        A_max = 65.6, K_c = 0.1, nu = 0.4, sigma = 1.0,
+        g_Kv = 2.0, E_K = -74.0, g_Ca = 0.7, Ca_o = 1600.0,
+        g_Cl = 2.0, E_Cl = -20.0, g_KCa = 5.0,
         alpha_Glu = 1.0, V_Glu_half = -40.0, V_Glu_slope = 5.0, tau_Glu = 5.0
     )
 end
 
 function default_cone_params()
+    # NOTE: G_dark must equal alpha_G / beta_G for steady state in darkness
     PhototransductionParams(
         C_m = 20.0, g_L = 2.0, E_L = -70.0,
         eta = 0.5, tau_R = 10.0,           # faster inactivation
-        alpha_G = 20.0, beta_G = 0.5, gamma_PDE = 5.0,
+        alpha_G = 2.5, beta_G = 0.5, gamma_PDE = 5.0,  # FIXED: alpha_G reduced to match G_dark
         n_Ca = 2, Ca_dark = 0.3, G_dark = 5.0,  # weaker Ca feedback
-        n_G = 2.5, g_CNG_max = 30.0, E_CNG = 0.0,  # larger dark current
+        n_G = 2.5, g_CNG_max = 3.0, E_CNG = 0.0,
         f_Ca = 0.12, k_ex = 0.1, B_Ca = 50.0,
         g_H = 1.0, tau_H = 30.0, V_h_half = -70.0, k_h = -10.0, E_H = -30.0,  # less I_H
         g_Kv = 3.0, E_K = -84.0,

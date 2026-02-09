@@ -64,7 +64,7 @@ export
     compute_stimulus, flash_stimulus,
     # Simulation
     simulate_flash, extract_voltages, extract_neurotransmitters,
-    dark_adapted_state,
+    dark_adapted_state, retinal_column_rhs!,
     # ERG
     compute_erg, extract_ops,
     # Visualization

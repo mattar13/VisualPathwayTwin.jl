@@ -1,136 +1,180 @@
 # ============================================================
-# run_model.jl — Interactive Walkthrough of the Retinal Digital Twin
-# ============================================================
+# run_model.jl — Step-by-step retinal column simulation
 #
-# This script walks through the retinal column simulation step by step.
-# Run it section by section in the Julia REPL, or all at once.
-#
-# Each section explains what is happening biologically and computationally.
+# Everything is explicit here. No hidden helper functions.
+# Run section by section in the REPL to see exactly what's happening.
 # ============================================================
-
-# --- Section 1: Setup ---
-# Load the package. First time may take a moment to precompile.
+using Revise
 using RetinalTwin
+#If we have revised the code, 
+using DifferentialEquations
+using Setfield
 
-println("=" ^ 60)
-println("  Retinal Digital Twin — Interactive Walkthrough")
-println("=" ^ 60)
-
-# --- Section 2: Build the Retinal Column ---
-# The retinal column is the minimal vertical pathway from photoreceptors
-# to ganglion cells. It contains 11 cell types with a total of ~193 ODEs.
-#
-# Population: 20 rods, 5 cones, 2 HCs, 1 ON-BC, 1 OFF-BC,
-#             3 A2 amacrines, 3 GABA amacrines, 1 DA amacrine,
-#             1 ganglion cell, 1 Müller glia, 1 RPE
+# ── 1. Build the retinal column ──────────────────────────────
 
 col = build_retinal_column(regime=:scotopic)
 sidx = StateIndex(col)
 
-println("\nRetinal column built:")
-println("  Rods:       $(col.pop.n_rod)")
-println("  Cones:      $(col.pop.n_cone)")
-println("  HCs:        $(col.pop.n_hc)")
-println("  ON-BCs:     $(col.pop.n_on)")
-println("  OFF-BCs:    $(col.pop.n_off)")
-println("  A2 amac:    $(col.pop.n_a2)")
-println("  GABA amac:  $(col.pop.n_gaba)")
-println("  DA amac:    $(col.pop.n_dopa)")
-println("  GCs:        $(col.pop.n_gc)")
-println("  Müller:     $(col.pop.n_muller)")
-println("  RPE:        $(col.pop.n_rpe)")
-println("  Total ODEs: $(sidx.total)")
+println("Retinal column: $(sidx.total) ODEs")
+println("  Rods: $(col.pop.n_rod)  |  Cones: $(col.pop.n_cone)")
+println("  HC: $(col.pop.n_hc)  |  ON-BC: $(col.pop.n_on)  |  OFF-BC: $(col.pop.n_off)")
+println("  A2: $(col.pop.n_a2)  |  GABA: $(col.pop.n_gaba)  |  DA: $(col.pop.n_dopa)")
+println("  GC: $(col.pop.n_gc)  |  Müller: $(col.pop.n_muller)  |  RPE: $(col.pop.n_rpe)")
 
-# --- Section 3: Simulate a Dim Flash (Scotopic) ---
-# A dim flash primarily activates rods. We expect to see:
-#   - a-wave: negative deflection from photoreceptor hyperpolarization
-#   - b-wave: positive deflection from ON-bipolar depolarization
-#   - OPs: fast oscillations on the b-wave ascending limb (A2↔GABA network)
+# State vector layout (flat vector, 1-indexed ranges):
+println("\nState index ranges:")
+println("  rod:     $(sidx.rod)      (6 vars × $(col.pop.n_rod): R*, G, Ca, V, h, Glu)")
+println("  cone:    $(sidx.cone)  (6 vars × $(col.pop.n_cone): R*, G, Ca, V, h, Glu)")
+println("  hc:      $(sidx.hc)  (3 vars × $(col.pop.n_hc): V, w, s_Glu)")
+println("  on_bc:   $(sidx.on_bc)  (4 vars × $(col.pop.n_on): V, w, S_mGluR6, Glu)")
+println("  off_bc:  $(sidx.off_bc)  (4 vars × $(col.pop.n_off): V, w, s_Glu, Glu)")
+println("  a2:      $(sidx.a2)  (3 vars × $(col.pop.n_a2): V, w, Gly)")
+println("  gaba_ac: $(sidx.gaba_ac)  (3 vars × $(col.pop.n_gaba): V, w, GABA)")
+println("  da_ac:   $(sidx.da_ac)  (3 vars × $(col.pop.n_dopa): V, w, DA)")
+println("  gc:      $(sidx.gc)  (2 vars × $(col.pop.n_gc): V, w)")
+println("  muller:  $(sidx.muller)  (4 vars × $(col.pop.n_muller): V_M, K_o_end, K_o_stalk, Glu_o)")
+println("  rpe:     $(sidx.rpe)  (2 vars × $(col.pop.n_rpe): V_RPE, K_sub)")
 
-println("\n--- Simulating dim scotopic flash ---")
-println("Intensity: 10 photons/µm²/ms, Duration: 10 ms")
-println("Simulation window: 1000 ms")
+# ── 2. Configure stimulus ────────────────────────────────────
 
-result_dim = simulate_flash(intensity=10.0, duration=10.0, t_total=1000.0)
-println("Done! $(length(result_dim.t)) timepoints saved.")
+intensity = 10.0      # photons/µm²/ms (dim scotopic flash)
+duration  = 10.0      # ms
+t_on      = 200.0     # ms — flash onset (give 200 ms dark baseline)
 
-# --- Section 4: Plot the ERG ---
-# The ERG (electroretinogram) is a field potential recorded at the cornea.
-# It is the weighted sum of all transmembrane currents in the retina.
+col = @set col.stimulus.I_0    = intensity
+col = @set col.stimulus.t_dur  = duration
+col = @set col.stimulus.t_on   = t_on
 
-println("\nPlotting ERG...")
-fig_erg = plot_erg(result_dim, show_components=true)
-display(fig_erg)
-# Uncomment to save: save("dim_flash_erg.png", fig_erg)
+println("\nStimulus: $(intensity) ph/µm²/ms, onset=$(t_on) ms, duration=$(duration) ms")
+println("  Background: $(col.stimulus.background)")
 
-# --- Section 5: Look at Cell Voltages ---
-# Each cell type has distinct dynamics. Photoreceptors hyperpolarize in light,
-# ON-bipolars depolarize (sign inversion via mGluR6), and amacrines oscillate.
+# Verify the stimulus function works:
+println("  Phi at t=0:   $(compute_stimulus(col.stimulus, 0.0))")
+println("  Phi at t=205: $(compute_stimulus(col.stimulus, 205.0))")
+println("  Phi at t=220: $(compute_stimulus(col.stimulus, 220.0))")
 
-println("\nPlotting cell membrane potentials...")
-fig_v = plot_cell_voltages(result_dim,
-    cell_types=[:rod, :cone, :on_bc, :off_bc, :a2, :gaba_ac, :gc])
-display(fig_v)
+# ── 3. Connection table ──────────────────────────────────────
 
-# --- Section 6: Intensity Series ---
-# The a-wave and b-wave amplitudes follow a Naka-Rushton (sigmoidal) function
-# when plotted against log intensity. Let's run several intensities.
-
-println("\n--- Running intensity series ---")
-intensities = [1.0, 10.0, 100.0, 1000.0, 10000.0]
-results = []
-
-for I in intensities
-    println("  Intensity = $I ...")
-    r = simulate_flash(intensity=I, duration=10.0, t_total=1000.0)
-    push!(results, r)
+conns = default_connections()
+println("\n$(length(conns)) synaptic connections:")
+for c in conns
+    println("  $(c.pre) → $(c.post)  [$(c.nt_type), $(c.receptor), g=$(c.g_max) nS, E=$(c.E_rev) mV]")
 end
-println("All intensities complete.")
 
-# --- Section 7: Intensity-Response Plot ---
-println("\nPlotting intensity-response function...")
-fig_ir = plot_intensity_response(results, measure=:b_wave)
-display(fig_ir)
+# ── 4. Initial conditions (dark-adapted) ─────────────────────
 
-# --- Section 8: Extract Oscillatory Potentials ---
-# OPs are fast oscillations (100-160 Hz) generated by the A2↔GABA reciprocal
-# inhibitory network. They ride on the ascending limb of the b-wave.
-# Extract by bandpass filtering at 75-300 Hz.
+u0 = dark_adapted_state(col, sidx)
+println("\nInitial state vector: $(length(u0)) elements")
 
-println("\nExtracting oscillatory potentials...")
-fig_ops = plot_ops(result_dim, time_window=(180.0, 280.0))
-display(fig_ops)
+# Spot-check a few values:
+rod1_offset = sidx.rod[1]
+println("  Rod 1: R*=$(u0[rod1_offset]), G=$(u0[rod1_offset+1]), Ca=$(u0[rod1_offset+2]), V=$(u0[rod1_offset+3]) mV, h=$(u0[rod1_offset+4]), Glu=$(u0[rod1_offset+5])")
 
-# --- Section 9: Bright Flash (Photopic-like) ---
-# A very bright flash saturates rods and drives cones.
-# We expect faster kinetics and a more prominent OFF response (d-wave).
+on_offset = sidx.on_bc[1]
+println("  ON-BC: V=$(u0[on_offset]) mV, w=$(u0[on_offset+1]), S_mGluR6=$(u0[on_offset+2]), Glu=$(u0[on_offset+3])")
 
-println("\n--- Simulating bright flash ---")
-result_bright = simulate_flash(intensity=50000.0, duration=10.0, t_total=1000.0)
-fig_bright = plot_erg(result_bright, show_components=true)
-display(fig_bright)
+gc_offset = sidx.gc[1]
+println("  GC:    V=$(u0[gc_offset]) mV, w=$(u0[gc_offset+1])")
 
-# --- Section 10: Long Simulation with c-wave ---
-# The c-wave is generated by the RPE and peaks at 2-5 seconds.
-# Need a longer simulation window to see it.
+println("  All finite? $(all(isfinite, u0))")
+println("  Any NaN?    $(any(isnan, u0))")
 
-println("\n--- Simulating with c-wave (5 second window) ---")
-result_long = simulate_flash(intensity=1000.0, duration=10.0, t_total=5000.0, dt_save=1.0)
-fig_long = plot_erg(result_long, show_components=true)
-display(fig_long)
+# ── 5. Set up and solve the ODE ──────────────────────────────
 
-# --- Section 11: Exploring Parameters ---
-# The model is fully parameterized. You can modify any cell type's parameters
-# using Setfield.jl's @set macro.
+t_total  = 1000.0   # ms simulation window
+dt_save  = 0.1      # ms save interval
+tspan    = (0.0, t_total)
+p        = (col, sidx, conns)
 
-println("\n--- Parameter exploration examples ---")
-println("Try in the REPL:")
-println("  using Setfield")
-println("  col = build_retinal_column()")
-println("  col = @set col.a2_params.phi = 0.3     # faster A2 dynamics → shift OP frequency")
-println("  col = @set col.mglur6_params.tau_mGluR6 = 50.0  # slower b-wave")
-println("  col = @set col.rod_params.g_H = 4.0    # stronger I_H → bigger nose")
+println("\nSetting up ODE problem...")
+println("  tspan: $(tspan)")
+println("  dt_save: $(dt_save) ms → expect ~$(Int(t_total / dt_save)) saved timepoints")
 
-println("\n" * "=" ^ 60)
-println("  Walkthrough complete!")
-println("=" ^ 60)
+prob = ODEProblem(retinal_column_rhs!, u0, tspan, p)
+
+# Test the RHS at t=0 to make sure it doesn't error or produce NaN:
+du_test = similar(u0)
+retinal_column_rhs!(du_test, u0, p, 0.0)
+println("  RHS at t=0: all finite? $(all(isfinite, du_test))")
+println("  RHS at t=0: any NaN?    $(any(isnan, du_test))")
+println("  RHS max |du|: $(maximum(abs, du_test))")
+
+# Also test at flash onset:
+retinal_column_rhs!(du_test, u0, p, t_on + 1.0)
+println("  RHS at t=$(t_on+1): all finite? $(all(isfinite, du_test))")
+println("  RHS at t=$(t_on+1): max |du|: $(maximum(abs, du_test))")
+
+println("\nSolving ODE (Rodas5 — stiff implicit solver)...")
+sol = solve(prob, Rodas5();
+            saveat=dt_save,
+            abstol=1e-6, reltol=1e-4,
+            maxiters=1_000_000)
+
+println("  Solver return code: $(sol.retcode)")
+println("  Timepoints saved:  $(length(sol.t))")
+println("  Time range:        $(sol.t[1]) → $(sol.t[end]) ms")
+println("  Solution finite?   $(all(u -> all(isfinite, u), sol.u))")
+
+if length(sol.t) < 10
+    println("\n⚠ WARNING: Very few timepoints returned. The solver may have failed.")
+    println("  sol.t = $(sol.t)")
+    if length(sol.u) >= 1
+        u_last = sol.u[end]
+        println("  Last state has NaN? $(any(isnan, u_last))")
+        println("  Last state has Inf? $(any(isinf, u_last))")
+        # Find which variables went bad:
+        bad_idx = findall(x -> !isfinite(x), u_last)
+        if !isempty(bad_idx)
+            println("  Non-finite at indices: $(bad_idx)")
+        end
+    end
+    println("\nStopping here — fix the solver issue before continuing.")
+else
+    # ── 6. Inspect raw solution ──────────────────────────────────
+
+    println("\nSpot-checking solution at key timepoints:")
+    for t_check in [0.0, 100.0, t_on, t_on + 5.0, t_on + 50.0, t_on + 200.0, 500.0]
+        ti = argmin(abs.(sol.t .- t_check))
+        u = sol.u[ti]
+        rod_V = u[rod1_offset + 3]
+        on_V  = u[on_offset]
+        gc_V  = u[gc_offset]
+        println("  t=$(round(sol.t[ti], digits=1)) ms:  Rod V=$(round(rod_V, digits=2)) mV,  ON-BC V=$(round(on_V, digits=2)) mV,  GC V=$(round(gc_V, digits=2)) mV")
+    end
+
+    # ── 7. Compute ERG ───────────────────────────────────────────
+
+    println("\nComputing ERG field potential...")
+    erg, components = compute_erg(sol, col, sidx)
+    println("  ERG trace length: $(length(erg))")
+    println("  Components: $(keys(components))")
+    println("  a-wave min:  $(round(minimum(components[:a_wave]), digits=4))")
+    println("  b-wave max:  $(round(maximum(components[:b_wave]), digits=4))")
+    println("  OP range:    $(round(minimum(components[:OPs]), digits=4)) to $(round(maximum(components[:OPs]), digits=4))")
+    println("  c-wave max:  $(round(maximum(components[:c_wave]), digits=4))")
+
+    # ── 8. Extract voltages ──────────────────────────────────────
+
+    println("\nExtracting cell voltages...")
+    voltages = extract_voltages(sol, col, sidx)
+    for (name, V) in voltages
+        println("  $(name): $(size(V, 2)) cells, V range = $(round(minimum(V), digits=1)) to $(round(maximum(V), digits=1)) mV")
+    end
+
+    # ── 9. Build result tuple (for plotting functions) ───────────
+
+    result = (t=sol.t, erg=erg, erg_components=components,
+              cell_voltages=voltages, solution=sol, col=col, sidx=sidx)
+
+    # ── 10. Plot (uncomment when ready) ──────────────────────────
+
+    # fig_erg = plot_erg(result, show_components=true)
+    # display(fig_erg)
+    #
+    # fig_v = plot_cell_voltages(result,
+    #     cell_types=[:rod, :cone, :on_bc, :off_bc, :a2, :gaba_ac, :gc])
+    # display(fig_v)
+
+    println("\nDone. Result tuple available as `result`.")
+    println("Uncomment plotting section or call plot_erg(result) / plot_cell_voltages(result)")
+end

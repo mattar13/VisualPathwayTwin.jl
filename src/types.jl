@@ -4,6 +4,14 @@
 
 using Parameters
 
+const ROD_STATE_VARS = 19
+const CONE_STATE_VARS = 6
+
+const ROD_V_INDEX = 1
+const ROD_GLU_INDEX = 19
+const CONE_V_INDEX = 4
+const CONE_GLU_INDEX = 6
+
 """
     NTReleaseParams
 
@@ -78,6 +86,88 @@ plus photoreceptor membrane dynamics.
     V_Glu_half::Float64 = -40.0 # mV
     V_Glu_slope::Float64 = 5.0  # mV
     tau_Glu::Float64 = 5.0      # ms — release time constant
+end
+
+"""
+    RodPhotoreceptorParams
+
+Parameters for the biophysical rod model in `docs/rod_photoreceptor_model.md`.
+Rates are in 1/s and converted to 1/ms inside the update function.
+"""
+@with_kw struct RodPhotoreceptorParams
+    # Membrane
+    C_m::Float64 = 0.02          # nF
+    g_L::Float64 = 0.35          # nS
+    E_L::Float64 = -77.0         # mV
+
+    # Light -> Rh* drive
+    eta::Float64 = 0.67
+
+    # Phototransduction cascade
+    alpha1::Float64 = 50.0       # 1/s
+    alpha2::Float64 = 0.0003     # 1/s
+    alpha3::Float64 = 0.03       # 1/s
+    epsilon::Float64 = 0.5       # 1/(s*uM)
+    beta1::Float64 = 2.5         # 1/s
+    tau1::Float64 = 0.2          # 1/(s*uM)
+    tau2::Float64 = 5.0          # 1/s
+    T_tot::Float64 = 1000.0      # uM
+    PDE_tot::Float64 = 100.0     # uM
+    J_max::Float64 = 5040.0      # pA
+    b::Float64 = 0.25            # uM/(s*pA)
+    gamma_Ca::Float64 = 50.0     # 1/s
+    C0::Float64 = 0.1            # uM
+    k1::Float64 = 0.2            # 1/(s*uM)
+    k2::Float64 = 0.8            # 1/s
+    eT::Float64 = 500.0          # uM
+    A_max::Float64 = 65.6        # uM/s
+    K_c::Float64 = 0.1           # uM
+    nu::Float64 = 0.4            # 1/s
+    sigma::Float64 = 1.0         # 1/(s*uM)
+
+    # Ionic currents
+    g_H::Float64 = 1.5           # nS
+    E_H::Float64 = -32.0         # mV
+    V_h_half::Float64 = -70.0    # mV
+    k_h::Float64 = -7.0          # mV
+
+    g_Kv::Float64 = 2.0          # nS
+    E_K::Float64 = -74.0         # mV
+
+    g_Ca::Float64 = 0.7          # nS
+    Ca_o::Float64 = 1600.0       # uM
+
+    g_Cl::Float64 = 2.0          # nS
+    E_Cl::Float64 = -20.0        # mV
+
+    g_KCa::Float64 = 5.0         # nS
+
+    # Exchangers in membrane/Ca equations
+    J_ex_max::Float64 = 20.0     # pA
+    K_ex::Float64 = 0.2          # uM
+    J_ex2_max::Float64 = 5.0     # pA
+    K_ex2::Float64 = 0.5         # uM
+
+    # Intracellular calcium system
+    F::Float64 = 96485.33212     # C/mol
+    V1::Float64 = 3.812e-13      # L
+    V2::Float64 = 5.236e-13      # L
+    S1::Float64 = 3.142e-8       # effective geometry factor
+    delta::Float64 = 0.05
+    D_Ca::Float64 = 6.0e-8
+
+    Lb1::Float64 = 2.0           # 1/(s*uM)
+    Lb2::Float64 = 1.0           # 1/s
+    Hb1::Float64 = 1.11          # 1/(s*uM)
+    Hb2::Float64 = 1.0           # 1/s
+    B_L::Float64 = 500.0         # uM
+    B_H::Float64 = 300.0         # uM
+
+    # Glutamate release state for downstream circuitry
+    alpha_Glu::Float64 = 1.0
+    V_Glu_half::Float64 = -40.0
+    V_Glu_slope::Float64 = 5.0
+    tau_Glu::Float64 = 5.0       # ms
 end
 
 """
@@ -196,7 +286,7 @@ Complete parameters for one retinal column.
 """
 @with_kw struct RetinalColumn
     pop::PopulationSizes = PopulationSizes()
-    rod_params::PhototransductionParams = PhototransductionParams()
+    rod_params::RodPhotoreceptorParams = RodPhotoreceptorParams()
     cone_params::PhototransductionParams = PhototransductionParams()
     hc_params::MLParams = MLParams()
     on_params::MLParams = MLParams()
@@ -219,7 +309,7 @@ Named indices into the flat state vector.
 Computed from population sizes at construction time.
 """
 struct StateIndex
-    rod::UnitRange{Int}       # [R*, G, Ca, V, h, Glu] × N_rod
+    rod::UnitRange{Int}       # [V, mKv, hKv, mCa, mKCa, Ca_s, Ca_f, Cab_ls, Cab_hs, Cab_lf, Cab_hf, Rh, Rhi, Tr, PDE, Ca_photo, Cab_photo, cGMP, Glu] × N_rod
     cone::UnitRange{Int}      # [R*, G, Ca, V, h, Glu] × N_cone
     hc::UnitRange{Int}        # [V, w, s_Glu] × N_hc
     on_bc::UnitRange{Int}     # [V, w, S_mGluR6, Glu] × N_on
@@ -243,8 +333,8 @@ function StateIndex(col::RetinalColumn)
         return start:(idx[] - 1)
     end
 
-    rod     = next_range(p.n_rod, 6)
-    cone    = next_range(p.n_cone, 6)
+    rod     = next_range(p.n_rod, ROD_STATE_VARS)
+    cone    = next_range(p.n_cone, CONE_STATE_VARS)
     hc      = next_range(p.n_hc, 3)
     on_bc   = next_range(p.n_on, 4)
     off_bc  = next_range(p.n_off, 4)
