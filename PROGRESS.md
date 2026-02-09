@@ -8,6 +8,8 @@
 ## Recent Updates
 - 2026-02-09: Added validation helper to compute ERG wave peaks, OP amplitude, and rod hyperpolarization metrics from simulation outputs. Exposed the helper in the module API for downstream workflows.
 
+-REALLY IMPORTANT NOTE: clamping values, constraining values, (i.e. max, min, clamp) are unbiological and I want you to proceed without these functions. 
+
 ## Architecture
 - Julia package: RetinalTwin
 - ODE system: 193 state variables (flat vector), solved with DifferentialEquations.jl
