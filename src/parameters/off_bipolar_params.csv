@@ -11,6 +11,9 @@ V2,18.0,Ca activation slope (mV)
 V3,2.0,K activation midpoint (mV)
 V4,17.0,K activation slope (mV)
 phi,0.067,Recovery time scale
+g_iGluR,4.0,Ionotropic glutamate receptor conductance (nS)
+E_Glu,0.0,Glutamate receptor reversal potential (mV)
+tau_iGluR,3.0,iGluR gating time constant (ms)
 alpha_Glu,1.0,Max glutamate release
 V_Glu_half,-35.0,Release half-activation (mV)
 V_Glu_slope,5.0,Release slope (mV)
