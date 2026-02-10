@@ -28,13 +28,15 @@ println("  Phi at t=$(t_on + duration + 1.0): $(compute_stimulus(stim, t_on + du
 # ── 2. Dark-adapted initial conditions (rod only) ────────────
 
 u0 = rod_dark_state(rod_params)
-println("Initial rod state (dark adapted): V=$(u0[RetinalTwin.ROD_V_INDEX]) mV, cGMP=$(u0[RetinalTwin.ROD_CGMP_INDEX])")
 
 # ── 3. Rod-only ODE ──────────────────────────────────────────
 
+# For rod_model!, we need to pass (params, Phi, I_feedback) where Phi varies with time
+# So we create a wrapper that computes Phi from the stimulus
 p = (rod_params, stim, 0.0)
 tspan = (0.0, 10.0)
-prob = ODEProblem(rod_rhs!, u0, tspan, p)
+func = (du, u, p, t) -> photoreceptor_model_with_stim!(du, u, p, t, stim)
+prob = ODEProblem(func, u0, tspan, p)
 
 println("\nSolving rod-only model...")
 sol = solve(prob, Rodas5(); saveat=0.1, abstol=1e-6, reltol=1e-4)
