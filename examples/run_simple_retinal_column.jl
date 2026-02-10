@@ -2,7 +2,7 @@
 # simple_retinal_column.jl
 # Simple example using retinal_column_model! for photoreceptor → ON bipolar coupling
 # ============================================================
-
+using Revise
 using RetinalTwin
 using DifferentialEquations
 using CairoMakie
@@ -36,8 +36,6 @@ stim_params = (
     stim_start = 50.0,    # ms
     stim_end = 55.0,      # ms (5 ms flash)
     photon_flux = 10.0,   # photons/µm²/ms
-    v_hold = false,       # no voltage clamp
-    I_feedback = 0.0      # no feedback current (pA)
 )
 
 println("\n3. Stimulus configuration:")
