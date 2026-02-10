@@ -1,0 +1,17 @@
+Key,Value,Description
+C_m,20.0,Membrane capacitance (pF)
+g_L,2.0,Leak conductance (nS)
+g_Ca,4.0,Ca conductance (nS)
+g_K,8.0,K conductance (nS)
+E_L,-50.0,Leak reversal potential (mV)
+E_Ca,120.0,Ca reversal potential (mV)
+E_K,-84.0,K reversal potential (mV)
+V1,-1.2,Ca activation midpoint (mV)
+V2,18.0,Ca activation slope (mV)
+V3,2.0,K activation midpoint (mV)
+V4,17.0,K activation slope (mV)
+phi,0.067,Recovery time scale
+alpha_Glu,1.0,Max glutamate release
+V_Glu_half,-35.0,Release half-activation (mV)
+V_Glu_slope,5.0,Release slope (mV)
+tau_Glu,5.0,Glutamate clearance time (ms)

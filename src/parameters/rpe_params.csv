@@ -1,0 +1,11 @@
+Key,Value,Description
+tau_RPE,3000.0,Membrane time constant (ms)
+g_K_apical,5.0,Apical K+ conductance (nS)
+g_Cl_baso,2.0,Basal Cl- conductance (nS)
+g_L_RPE,0.5,Leak conductance (nS)
+E_Cl,-50.0,Cl- reversal potential (mV)
+E_L_RPE,-60.0,Leak reversal potential (mV)
+K_sub_rest,3.0,Resting subretinal K+ (mM)
+k_RPE,0.0005,K+ clearance rate (1/ms)
+alpha_K_RPE,0.001,K+ flux scaling
+K_i,140.0,Intracellular K+ (mM)

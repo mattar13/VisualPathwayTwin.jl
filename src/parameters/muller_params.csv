@@ -1,0 +1,10 @@
+Key,Value,Description
+C_m,30.0,Membrane capacitance (pF)
+g_Kir_end,5.0,Endfoot Kir conductance (nS)
+g_Kir_stalk,2.0,Stalk Kir conductance (nS)
+K_o_rest,3.0,Resting extracellular K+ (mM)
+K_i,140.0,Intracellular K+ (mM)
+tau_K_diffusion,200.0,K+ clearance time constant (ms)
+alpha_K,0.001,K+ release per unit current
+V_max_EAAT,0.5,Max glutamate uptake rate (µM/ms)
+K_m_EAAT,10.0,Glutamate uptake Km (µM)
