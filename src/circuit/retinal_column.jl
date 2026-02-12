@@ -12,6 +12,8 @@ const PHOTORECEPTOR_SIZE = 21
 
 const ON_BIPOLAR_OFFSET = 22
 const ON_BIPOLAR_SIZE = 6
+const OFF_BIPOLAR_OFFSET = ON_BIPOLAR_OFFSET + ON_BIPOLAR_SIZE
+const OFF_BIPOLAR_SIZE = 7
 
 # ── Default parameters ──────────────────────────────────────
 
@@ -28,7 +30,8 @@ NamedTuple with:
 function default_retinal_params()
     return (
         PHOTORECEPTOR_PARAMS = default_rod_params_csv(),
-        ON_BIPOLAR_PARAMS = default_on_bc_params_csv()
+        ON_BIPOLAR_PARAMS = default_on_bc_params_csv(),
+        OFF_BIPOLAR_PARAMS = default_off_bc_params_csv()
     )
 end
 
@@ -49,9 +52,10 @@ function retinal_column_initial_conditions(params)
     # Get individual cell initial conditions
     u0_photoreceptor = rod_dark_state(params.PHOTORECEPTOR_PARAMS)
     u0_on_bipolar = on_bipolar_dark_state(params.ON_BIPOLAR_PARAMS)
+    u0_off_bipolar = off_bipolar_dark_state(params.OFF_BIPOLAR_PARAMS)
 
     # Concatenate into single state vector
-    return vcat(u0_photoreceptor, u0_on_bipolar)
+    return vcat(u0_photoreceptor, u0_on_bipolar, u0_off_bipolar)
 end
 
 # ── Auxiliary functions ─────────────────────────────────────
@@ -98,8 +102,10 @@ function retinal_column_model!(du, u, p, t)
     # === Extract state segments using views (efficient, no copying) ===
     u_photoreceptor = @view u[1:PHOTORECEPTOR_SIZE]
     u_on_bipolar = @view u[ON_BIPOLAR_OFFSET:ON_BIPOLAR_OFFSET + ON_BIPOLAR_SIZE - 1]
+    u_off_bipolar = @view u[OFF_BIPOLAR_OFFSET:OFF_BIPOLAR_OFFSET + OFF_BIPOLAR_SIZE - 1]
     du_photoreceptor = @view du[1:PHOTORECEPTOR_SIZE]
     du_on_bipolar = @view du[ON_BIPOLAR_OFFSET:ON_BIPOLAR_OFFSET + ON_BIPOLAR_SIZE - 1]
+    du_off_bipolar = @view du[OFF_BIPOLAR_OFFSET:OFF_BIPOLAR_OFFSET + OFF_BIPOLAR_SIZE - 1]
     # === Neurotransmitter coupling ===
 
     # Get glutamate release from photoreceptor state
@@ -114,6 +120,10 @@ function retinal_column_model!(du, u, p, t)
     # ON bipolar (receives glutamate from photoreceptor)
     on_bipolar_model!(du_on_bipolar, u_on_bipolar,
                       (params.ON_BIPOLAR_PARAMS, glu_release), t)
+
+    # OFF bipolar (receives glutamate from photoreceptor)
+    off_bipolar_model!(du_off_bipolar, u_off_bipolar,
+                       (params.OFF_BIPOLAR_PARAMS, glu_release), t)
 
     return nothing
 end

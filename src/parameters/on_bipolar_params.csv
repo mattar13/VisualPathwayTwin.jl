@@ -2,12 +2,7 @@ Key,Value,Description
 C_m,30.0,Membrane capacitance (pF)
 g_L,1.0,Leak conductance (nS)
 E_L,-55.0,Leak reversal potential (mV)
-g_TRPM1,3.0,TRPM1 nonselective cation conductance (nS)
-E_TRPM1,0.0,TRPM1 reversal potential (mV)
-K_Glu,0.50,Glutamate half-activation for mGluR6 cascade (same units as input)
-n_Glu,20.0,Hill coefficient for glutamate-mGluR6 coupling
-a_S, 0.5, Glutamate-mGluR6 coupling scaling factor
-tau_S,50.0,mGluR6 cascade time constant (ms)
+
 g_Kv,4.0,Delayed rectifier K conductance (Kv1 family, nS)
 E_K,-85.0,Potassium reversal potential (mV)
 Vn_half,-30.0,Kv activation midpoint (mV)
@@ -28,7 +23,15 @@ k_c,0.005,Ca influx to pool scaling factor
 g_KCa,1.5,Ca-activated K conductance (nS)
 K_c,0.5,Ca half-activation for KCa channel
 n_c,2.0,Hill coefficient for Ca-activated K
-K_Release,1.0,Glutamate release half-activation (µM)
-n_Release,1.0,Hill coefficient for glutamate release
+
+K_Glu,0.50,Glutamate half-activation for mGluR6 cascade (same units as input)
+n_Glu,20.0,Hill coefficient for glutamate-mGluR6 coupling
+a_S, 0.5, Glutamate-mGluR6 coupling scaling factor
+tau_S,50.0,mGluR6 cascade time constant (ms)
+g_TRPM1,3.0,TRPM1 nonselective cation conductance (nS)
+E_TRPM1,0.0,TRPM1 reversal potential (mV)
+
+K_Release,0.6,Glutamate release half-activation (µM)
+n_Release,3.0,Hill coefficient for glutamate release
 a_Release,0.60,Glutamate release scaling factor
-tau_Release,1.0,Glutamate release time constant (ms)
+tau_Release,5.0,Glutamate release time constant (ms)

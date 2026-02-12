@@ -46,6 +46,7 @@ export
     # Retinal column state organization
     PHOTORECEPTOR_OFFSET, PHOTORECEPTOR_SIZE,
     ON_BIPOLAR_OFFSET, ON_BIPOLAR_SIZE,
+    OFF_BIPOLAR_OFFSET, OFF_BIPOLAR_SIZE,
     # Parameter loading
     default_rod_params,
     default_hc_params, default_on_bc_params, default_off_bc_params,

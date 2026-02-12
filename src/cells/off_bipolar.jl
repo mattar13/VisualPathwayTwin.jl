@@ -33,22 +33,50 @@ Return dark-adapted initial conditions for an OFF bipolar cell.
 - `params`: named tuple from `default_off_bc_params()`
 
 # Returns
-- 4-element state vector [V, w, s_Glu, Glu_release]
+- 7-element state vector [V, n, h, c, A, D, G]
 """
 function off_bipolar_dark_state(params)
-    u0 = zeros(OFFBC_STATE_VARS)
-    u0[OFFBC_V_INDEX] = -60.0      # Resting potential
-    u0[OFFBC_W_INDEX] = 0.01       # Small recovery variable
-    u0[OFFBC_S_GLU_INDEX] = 0.0    # Ionotropic Glu gating
-    u0[OFFBC_GLU_INDEX] = 0.0      # No glutamate release at rest
-    return u0
+    V0 = -60.0
+    n0 = gate_inf(V0, params.Vn_half, params.kn_slope)
+    h0 = gate_inf(V0, params.Vh_half, params.kh_slope)
+    c0 = 0.0
+    A0 = 0.0
+    D0 = 0.0
+    G0 = 0.0
+    return [V0, n0, h0, c0, A0, D0, G0]
 end
 
 # ── 3. Auxiliary Functions ──────────────────────────────────
 
-# Use shared ML functions from horizontal.jl
-# m_inf_ml(V, V1, V2), w_inf_ml(V, V3, V4), tau_w_ml(V, V3, V4)
+#This function is already defined in on_bipolar.jl
+# @inline function hill(x, K, n)
+#     # bounded [0,1], handles x>=0
+#     xn = x^n
+#     return xn / (K^n + xn + eps())
+# end
+#So is this one
+# @inline function gate_inf(V, Vhalf, k)
+#     # logistic with slope k (mV). k can be negative (e.g. Ih)
+#     return 1.0 / (1.0 + exp(-(V - Vhalf) / k))
+# end
 
+"""
+OFF ionotropic receptor activation function
+"""
+@inline function A_inf(glu, K, n)
+    # Increasing Hill: more glutamate -> more activation (OFF pathway)
+    return hill(max(glu, 0.0), K, n)
+end
+
+"""
+OFF ionotropic receptor desensitization function
+"""
+@inline function D_inf(glu, K, n)
+    # Fraction available (NOT desensitized).
+    # More glutamate -> more desensitization -> less availability.
+    # 1 / (1 + (glu/K)^n)
+    return 1.0 / (1.0 + (max(glu, 0.0) / K)^n)
+end
 # ── 4. Mathematical Model ───────────────────────────────────
 
 """
@@ -74,62 +102,58 @@ Ionotropic synapse: depolarizes when glutamate is high (dark),
 hyperpolarizes when Glu drops (light).
 """
 function off_bipolar_model!(du, u, p, t)
-    params, glu_mean, I_inh, I_mod = p
+    params, glu_received = p
 
     # Decompose state vector using tuple unpacking
-    V, w, s_Glu, Glu_rel = u
+    V, n, h, c, A, D, G = u
 
-    # Extract Morris-Lecar parameters
-    C_m = params.C_m
-    g_L = params.g_L
-    g_Ca = params.g_Ca
-    g_K = params.g_K
-    E_L = params.E_L
-    E_Ca = params.E_Ca
-    E_K = params.E_K
-    V1 = params.V1
-    V2 = params.V2
-    V3 = params.V3
-    V4 = params.V4
-    phi = params.phi
-
-    # Extract glutamate receptor parameters
-    g_iGluR = params.g_iGluR
-    E_Glu = params.E_Glu
-    tau_iGluR = params.tau_iGluR
-
-    # Extract glutamate release parameters
-    alpha_Glu = params.alpha_Glu
-    V_Glu_half = params.V_Glu_half
-    V_Glu_slope = params.V_Glu_slope
-    tau_Glu = params.tau_Glu
-
-    # Ionotropic glutamate gating (fast, tau ~ 3 ms)
-    ds_Glu = (glu_mean - s_Glu) / tau_iGluR
-
-    # Excitatory synaptic current from photoreceptor glutamate
-    I_Glu = g_iGluR * s_Glu * (V - E_Glu)
+    # -------- OFF ionotropic receptor (AMPA/KAR-like) --------
+    A_INF = A_inf(glu_received, params.K_a, params.n_a)
+    dA = (params.a_a * A_INF - A) / params.tau_A
+    
+    # -------- desensitization --------
+    # Desensitization (optional but recommended for realistic OFF kinetics)
+    # If you don't want desensitization, set D=1 always by:
+    #   D = 1.0, dD = 0.0, or set tau_des huge and tau_rec small.
+    D_INF = D_inf(glu_received, params.K_d, params.n_d)
+    dD = (params.a_d * D_INF - D) / params.tau_d
+    
+    #-------- effective open probability --------
+    open_iGluR = A * D  # effective open probability
 
     # Morris-Lecar activation functions
-    m_inf = m_inf_ml(V, V1, V2)
-    w_inf = w_inf_ml(V, V3, V4)
-    tau_w = tau_w_ml(V, V3, V4)
+    n_inf = gate_inf(V, params.Vn_half, params.kn_slope)
+    dn = (n_inf - n) / params.tau_n
 
-    # Membrane currents
-    I_L = g_L * (V - E_L)
-    I_Ca = g_Ca * m_inf * (V - E_Ca)
-    I_K = g_K * w * (V - E_K)
+    h_inf = gate_inf(V, params.Vh_half, params.kh_slope) # kh_slope < 0 for Ih
+    dh = (h_inf - h) / params.tau_h
 
-    # Derivatives
-    dV = (-I_L - I_Ca - I_K + I_Glu + I_inh + I_mod) / C_m
-    dw = phi * (w_inf - w) / max(tau_w, 0.1)
+    m_inf = gate_inf(V, params.Vm_half, params.km_slope) # CaL activation (instant-ish)
+    # if you want dynamic m, swap to a state variable; here we keep it simple
 
-    # Glutamate release (graded, voltage-dependent)
-    R_glu = 1.0 / (1.0 + exp(-(V - V_Glu_half) / V_Glu_slope))
-    dGlu_rel = (alpha_Glu * R_glu - Glu_rel) / tau_Glu
+    # -------- currents --------
+    I_L     = params.g_L * (V - params.E_L)
+    I_Kv    = params.g_Kv * n * (V - params.E_K)
+    I_h     = params.g_h * h * (V - params.E_h)
+    I_CaL   = params.g_CaL * m_inf * (V - params.E_Ca)
+    # OFF synaptic current (nonselective cation, reversal ~0 mV)
+    I_iGluR = params.g_iGluR * open_iGluR * (V - params.E_iGluR)
 
-    # Assign derivatives
-    du .= [dV, dw, ds_Glu, dGlu_rel]
+        #-------- Ca pool --------
+    # driven by inward Ca current only (when I_CaL is negative)
+    Ca_in = max(-I_CaL, 0.0)
+    dc = (-c / params.tau_c) + params.k_c * Ca_in
 
+    # KCa activation from Ca pool
+    a_c = hill(max(c, 0.0), params.K_c, params.n_c)
+    I_KCa = params.g_KCa * a_c * (V - params.E_K)
+    
+    # -------- voltage derivative --------
+    dV = (-I_L - I_iGluR - I_Kv - I_h - I_CaL - I_KCa) / params.C_m
+
+    # -------- output glutamate release proxy (Ca-driven) --------
+    dG = (params.a_Release * R_inf(c, params.K_Release, params.n_Release) - G) / params.tau_Release
+
+    du .= (dV, dn, dh, dc, dA, dD, dG)
     return nothing
 end
