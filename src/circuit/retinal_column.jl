@@ -3,18 +3,22 @@
 # ============================================================
 
 # ── State organization ──────────────────────────────────────
-# For single photoreceptor + single ON bipolar cell:
-# u = [photoreceptor_states(21), on_bipolar_states(7)]
-# Total: 25 state variables
 
-const PHOTORECEPTOR_OFFSET = 0
-const PHOTORECEPTOR_SIZE = 21
-
-const ON_BIPOLAR_OFFSET = 22
-const ON_BIPOLAR_SIZE = 6
-const OFF_BIPOLAR_OFFSET = ON_BIPOLAR_OFFSET + ON_BIPOLAR_SIZE
-const OFF_BIPOLAR_SIZE = 7
-
+DEFAULT_INDEXES = (
+    PC_ICS_ID_BEGIN = 1,
+    PC_ICS_ID_END = 21,
+    ONBC_ICS_ID_BEGIN = 22,
+    ONBC_ICS_ID_END = 27,
+    OFFBC_ICS_ID_BEGIN = 28,
+    OFFBC_ICS_ID_END = 34,
+    A2_ICS_ID_BEGIN = 35,
+    A2_ICS_ID_END = 41,
+    #Next we can define the neurotransmitter indices
+    PC_GLU_INDEX = 21,
+    ONBC_GLU_INDEX = 6,
+    OFFBC_GLU_INDEX = 7,
+    A2_GLY_INDEX = 7
+)
 # ── Default parameters ──────────────────────────────────────
 
 """
@@ -26,12 +30,15 @@ Load default parameters for photoreceptor and ON bipolar cells.
 NamedTuple with:
 - `PHOTORECEPTOR_PARAMS`: Rod photoreceptor parameters
 - `ON_BIPOLAR_PARAMS`: ON bipolar cell parameters
+- `OFF_BIPOLAR_PARAMS`: OFF bipolar cell parameters
+- `A2_AMACRINE_PARAMS`: A2 amacrine cell parameters
 """
 function default_retinal_params()
     return (
-        PHOTORECEPTOR_PARAMS = default_rod_params_csv(),
-        ON_BIPOLAR_PARAMS = default_on_bc_params_csv(),
-        OFF_BIPOLAR_PARAMS = default_off_bc_params_csv()
+        PHOTORECEPTOR_PARAMS = default_rod_params(),
+        ON_BIPOLAR_PARAMS = default_on_bc_params(),
+        OFF_BIPOLAR_PARAMS = default_off_bc_params(),
+        A2_AMACRINE_PARAMS = default_a2_params()
     )
 end
 
@@ -46,29 +53,46 @@ Build initial conditions for photoreceptor + ON bipolar system.
 - `params`: NamedTuple from `default_retinal_params()`
 
 # Returns
-- 25-element state vector [photoreceptor(21), on_bipolar(4)]
+- 25-element state vector [photoreceptor(21), on_bipolar(6), off_bipolar(7), a2(7)]
 """
 function retinal_column_initial_conditions(params)
     # Get individual cell initial conditions
-    u0_photoreceptor = rod_dark_state(params.PHOTORECEPTOR_PARAMS)
-    u0_on_bipolar = on_bipolar_dark_state(params.ON_BIPOLAR_PARAMS)
-    u0_off_bipolar = off_bipolar_dark_state(params.OFF_BIPOLAR_PARAMS)
+    ic_size = 0
+    u0_photoreceptor = photoreceptor_state(params.PHOTORECEPTOR_PARAMS)
+    println("Size of photoreceptor state vector: $(length(u0_photoreceptor))")
+    ic_size += length(u0_photoreceptor)
+    println("IC size after photoreceptor: $ic_size")
 
+    u0_on_bipolar = onbc_state(params.ON_BIPOLAR_PARAMS)
+    println("Size of on bipolar state vector: $(length(u0_on_bipolar))")
+    ic_size += length(u0_on_bipolar)
+    println("IC size after on bipolar: $ic_size")
+
+    u0_off_bipolar = offbc_state(params.OFF_BIPOLAR_PARAMS)
+    println("Size of off bipolar state vector: $(length(u0_off_bipolar))")
+    ic_size += length(u0_off_bipolar)
+    println("IC size after off bipolar: $ic_size")
+
+    u0_a2 = a2_state(params.A2_AMACRINE_PARAMS)
+    println("Size of a2 state vector: $(length(u0_a2))")
+    ic_size += length(u0_a2)
+    println("IC size after a2: $ic_size")
+
+    println("Total size of initial condition vector: $ic_size")
     # Concatenate into single state vector
-    return vcat(u0_photoreceptor, u0_on_bipolar, u0_off_bipolar)
+    return vcat(u0_photoreceptor, u0_on_bipolar, u0_off_bipolar, u0_a2)
 end
 
-# ── Auxiliary functions ─────────────────────────────────────
+# ── Auxillary Functions ─────────────────────────────────────
+#The only auxillary function we need to worry about is the gap junction coupling function
 
-"""
-    compute_glutamate_release(V, V_half, V_slope, alpha)
-
-Compute glutamate release from photoreceptor voltage using sigmoid.
-Higher (less negative) voltage → more glutamate release.
-"""
-function compute_glutamate_release(V::Real, V_half::Real, V_slope::Real, alpha::Real)
-    return alpha / (1.0 + exp(-(V - V_half) / V_slope))
+function gap_junction_coupling(dV1, V1, dV2, V2, cm1, cm2, g_gap)
+    I_gap1 = g_gap * (V1 - V2)
+    dV1 = -I_gap1 / cm1
+    dV2 = I_gap1 / cm2
+    return nothing
 end
+
 
 # ── Main model function ─────────────────────────────────────
 
@@ -88,42 +112,55 @@ ODE right-hand side for photoreceptor → ON bipolar cell system.
 # State vector organization
 ```
 u[1:21]   → Photoreceptor states [R, T, P, G, HC1-5, mKv, hKv, mCa, mKCa, Ca_s, Ca_f, CaB_ls, CaB_hs, CaB_lf, CaB_hf, V, Glu]
-u[22:25]  → ON bipolar states [V, w, S_mGluR6, Glu_release]
+u[22:27]  → ON bipolar states [V, n, h, c, S, Glu_release]
+u[28:34]  → OFF bipolar states [V, n, h, c, A, D, Glu_release]
+u[35:41]  → A2 amacrine states [V, n, h, c, A, D, Gly_Release]
 ```
 
 # Notes
 - Photoreceptor computes its own glutamate release (u[21])
 - Glutamate is passed directly to ON bipolar cell
 - ON bipolar inverts signal via mGluR6 cascade
+- A2 amacrine cell receives glutamate from ON bipolar cell and releases glycine
 """
 function retinal_column_model!(du, u, p, t)
-    params, stim_params = p
+    params, stim_func = p
 
+    idxs = DEFAULT_INDEXES
     # === Extract state segments using views (efficient, no copying) ===
-    u_photoreceptor = @view u[1:PHOTORECEPTOR_SIZE]
-    u_on_bipolar = @view u[ON_BIPOLAR_OFFSET:ON_BIPOLAR_OFFSET + ON_BIPOLAR_SIZE - 1]
-    u_off_bipolar = @view u[OFF_BIPOLAR_OFFSET:OFF_BIPOLAR_OFFSET + OFF_BIPOLAR_SIZE - 1]
-    du_photoreceptor = @view du[1:PHOTORECEPTOR_SIZE]
-    du_on_bipolar = @view du[ON_BIPOLAR_OFFSET:ON_BIPOLAR_OFFSET + ON_BIPOLAR_SIZE - 1]
-    du_off_bipolar = @view du[OFF_BIPOLAR_OFFSET:OFF_BIPOLAR_OFFSET + OFF_BIPOLAR_SIZE - 1]
+    u_photoreceptor = @view u[idxs.PC_ICS_ID_BEGIN:idxs.PC_ICS_ID_END]
+    u_on_bipolar = @view u[idxs.ONBC_ICS_ID_BEGIN:idxs.ONBC_ICS_ID_END]
+    u_off_bipolar = @view u[idxs.OFFBC_ICS_ID_BEGIN:idxs.OFFBC_ICS_ID_END]
+    u_a2 = @view u[idxs.A2_ICS_ID_BEGIN:idxs.A2_ICS_ID_END]
+
+    du_photoreceptor = @view du[idxs.PC_ICS_ID_BEGIN:idxs.PC_ICS_ID_END]
+    du_on_bipolar = @view du[idxs.ONBC_ICS_ID_BEGIN:idxs.ONBC_ICS_ID_END]
+    du_off_bipolar = @view du[idxs.OFFBC_ICS_ID_BEGIN:idxs.OFFBC_ICS_ID_END]
+    du_a2 = @view du[idxs.A2_ICS_ID_BEGIN:idxs.A2_ICS_ID_END]
     # === Neurotransmitter coupling ===
 
     # Get glutamate release from photoreceptor state
-    glu_release = u_photoreceptor[ROD_GLU_INDEX]
+    glu_photo_release = u_photoreceptor[idxs.PC_GLU_INDEX]
 
     # === Call individual cell models ===
 
     # Photoreceptor
-    photoreceptor_model!(du_photoreceptor, u_photoreceptor,
-               (params.PHOTORECEPTOR_PARAMS, stim_params), t)
+    photoreceptor_model!(du_photoreceptor, u_photoreceptor, (params.PHOTORECEPTOR_PARAMS, stim_func), t)
 
     # ON bipolar (receives glutamate from photoreceptor)
-    on_bipolar_model!(du_on_bipolar, u_on_bipolar,
-                      (params.ON_BIPOLAR_PARAMS, glu_release), t)
+    on_bipolar_model!(du_on_bipolar, u_on_bipolar, (params.ON_BIPOLAR_PARAMS, glu_photo_release), t)
+    glu_on_bipolar_release = u_on_bipolar[idxs.ONBC_GLU_INDEX]
 
     # OFF bipolar (receives glutamate from photoreceptor)
-    off_bipolar_model!(du_off_bipolar, u_off_bipolar,
-                       (params.OFF_BIPOLAR_PARAMS, glu_release), t)
+    off_bipolar_model!(du_off_bipolar, u_off_bipolar, (params.OFF_BIPOLAR_PARAMS, glu_photo_release), t)
+    glu_off_bipolar_release = u_off_bipolar[idxs.OFFBC_GLU_INDEX]
+
+    # A2 amacrine cell (receives glutamate from ON bipolar cell)
+    a2_model!(du_a2, u_a2, (params.A2_AMACRINE_PARAMS, glu_on_bipolar_release), t)
+    gly_a2_release = u_a2[idxs.A2_GLY_INDEX]
+
+    #Electrical coupling between cells
+    gap_junction_coupling(du_a2[1], u_a2[1], du_on_bipolar[1], u_on_bipolar[1], params.A2_AMACRINE_PARAMS.C_m, params.ON_BIPOLAR_PARAMS.C_m, params.A2_AMACRINE_PARAMS.g_gap)
 
     return nothing
 end
