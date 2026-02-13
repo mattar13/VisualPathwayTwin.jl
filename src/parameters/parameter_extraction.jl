@@ -17,7 +17,7 @@ The CSV should have columns: Key, Value, LowerBounds, UpperBounds, DEFAULT
 # Returns
 - Named tuple with parameter names as symbols and values as numbers
 """
-function load_photoreceptor_params_from_csv(csv_path::String)
+function load_params_from_csv(csv_path::String)
     # Read CSV file
     df = CSV.read(csv_path, DataFrame)
 
@@ -30,103 +30,103 @@ function load_photoreceptor_params_from_csv(csv_path::String)
 end
 
 """
-    default_rod_params_csv()
+    default_rod_params()
 
 Load default rod photoreceptor parameters from the bundled CSV file.
 """
-function default_rod_params_csv()
+function default_rod_params()
     csv_path = joinpath(@__DIR__, "photoreceptor_params.csv")
-    return load_photoreceptor_params_from_csv(csv_path)
+    return load_params_from_csv(csv_path)
 end
 
 """
-    default_hc_params_csv()
+    default_hc_params()
 
 Load default horizontal cell parameters from the bundled CSV file.
 """
-function default_hc_params_csv()
+function default_hc_params()
     csv_path = joinpath(@__DIR__, "horizontal_params.csv")
-    return load_photoreceptor_params_from_csv(csv_path)
+    return load_params_from_csv(csv_path)
 end
 
 """
-    default_on_bc_params_csv()
+    default_on_bc_params()
 
 Load default ON bipolar cell parameters from the bundled CSV file.
 """
-function default_on_bc_params_csv()
+function default_on_bc_params()
     csv_path = joinpath(@__DIR__, "on_bipolar_params.csv")
-    return load_photoreceptor_params_from_csv(csv_path)
+    return load_params_from_csv(csv_path)
 end
 
 """
-    default_off_bc_params_csv()
+    default_off_bc_params()
 
 Load default OFF bipolar cell parameters from the bundled CSV file.
 """
-function default_off_bc_params_csv()
+function default_off_bc_params()
     csv_path = joinpath(@__DIR__, "off_bipolar_params.csv")
-    return load_photoreceptor_params_from_csv(csv_path)
+    return load_params_from_csv(csv_path)
 end
 
 """
-    default_a2_params_csv()
+    default_a2_params()
 
 Load default A2 amacrine cell parameters from the bundled CSV file.
 """
-function default_a2_params_csv()
+function default_a2_params()
     csv_path = joinpath(@__DIR__, "a2_amacrine_params.csv")
-    return load_photoreceptor_params_from_csv(csv_path)
+    return load_params_from_csv(csv_path)
 end
 
 """
-    default_gaba_params_csv()
+    default_gaba_params()
 
 Load default GABAergic amacrine cell parameters from the bundled CSV file.
 """
-function default_gaba_params_csv()
+function default_gaba_params()
     csv_path = joinpath(@__DIR__, "gaba_amacrine_params.csv")
-    return load_photoreceptor_params_from_csv(csv_path)
+    return load_params_from_csv(csv_path)
 end
 
 """
-    default_da_params_csv()
+    default_da_params()
 
 Load default dopaminergic amacrine cell parameters from the bundled CSV file.
 """
-function default_da_params_csv()
+function default_da_params()
     csv_path = joinpath(@__DIR__, "da_amacrine_params.csv")
-    return load_photoreceptor_params_from_csv(csv_path)
+    return load_params_from_csv(csv_path)
 end
 
 """
-    default_gc_params_csv()
+    default_gc_params()
 
 Load default ganglion cell parameters from the bundled CSV file.
 """
-function default_gc_params_csv()
+function default_gc_params()
     csv_path = joinpath(@__DIR__, "ganglion_params.csv")
-    return load_photoreceptor_params_from_csv(csv_path)
+    return load_params_from_csv(csv_path)
 end
 
 """
-    default_muller_params_csv()
+    default_muller_params()
 
 Load default Müller glial cell parameters from the bundled CSV file.
 """
-function default_muller_params_csv()
+function default_muller_params()
     csv_path = joinpath(@__DIR__, "muller_params.csv")
-    return load_photoreceptor_params_from_csv(csv_path)
+    return load_params_from_csv(csv_path)
 end
 
 """
-    default_rpe_params_csv()
+    default_rpe_params()
 
 Load default RPE cell parameters from the bundled CSV file.
 """
-function default_rpe_params_csv()
+function default_rpe_params()
     csv_path = joinpath(@__DIR__, "rpe_params.csv")
-    return load_photoreceptor_params_from_csv(csv_path)
+    return load_params_from_csv(csv_path)
 end
 
 # ============================================================
@@ -160,15 +160,15 @@ on_bc_g_Ca = params.on_bc.g_Ca
 """
 function load_all_params()
     return (
-        rod = default_rod_params_csv(),
-        hc = default_hc_params_csv(),
-        on_bc = default_on_bc_params_csv(),
-        off_bc = default_off_bc_params_csv(),
-        a2 = default_a2_params_csv(),
-        gaba = default_gaba_params_csv(),
-        da = default_da_params_csv(),
-        gc = default_gc_params_csv(),
-        muller = default_muller_params_csv(),
-        rpe = default_rpe_params_csv()
+        rod = default_rod_params(),
+        hc = default_hc_params(),
+        on_bc = default_on_bc_params(),
+        off_bc = default_off_bc_params(),
+        a2 = default_a2_params(),
+        gaba = default_gaba_params(),
+        da = default_da_params(),
+        gc = default_gc_params(),
+        muller = default_muller_params(),
+        rpe = default_rpe_params()
     )
 end
