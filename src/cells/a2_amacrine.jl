@@ -74,56 +74,56 @@ Critical for oscillatory potential generation. Fast ML dynamics
 function a2_model!(du, u, p, t)
     params, glu_received = p
 
-   # Decompose state vector using tuple unpacking
-   V, n, h, c, A, D, Y = u
+    # Decompose state vector using tuple unpacking
+    V, n, h, c, A, D, Y = u
 
-   # -------- OFF ionotropic receptor (AMPA/KAR-like) --------
-   A_INF = A_inf(glu_received, params.K_a, params.n_a)
-   dA = (params.a_a * A_INF - A) / params.tau_A
-   
-   # -------- desensitization --------
-   # Desensitization (optional but recommended for realistic OFF kinetics)
-   # If you don't want desensitization, set D=1 always by:
-   #   D = 1.0, dD = 0.0, or set tau_des huge and tau_rec small.
-   D_INF = D_inf(glu_received, params.K_d, params.n_d)
-   dD = (params.a_d * D_INF - D) / params.tau_d
-   
-   #-------- effective open probability --------
-   open_iGluR = A * D  # effective open probability
+    # -------- OFF ionotropic receptor (AMPA/KAR-like) --------
+    A_INF = A_inf(glu_received, params.K_a, params.n_a)
+    dA = (params.a_a * A_INF - A) / params.tau_A
 
-   # Morris-Lecar activation functions
-   n_inf = gate_inf(V, params.Vn_half, params.kn_slope)
-   dn = (n_inf - n) / params.tau_n
+    # -------- desensitization --------
+    # Desensitization (optional but recommended for realistic OFF kinetics)
+    # If you don't want desensitization, set D=1 always by:
+    #   D = 1.0, dD = 0.0, or set tau_des huge and tau_rec small.
+    D_INF = D_inf(glu_received, params.K_d, params.n_d)
+    dD = (params.a_d * D_INF - D) / params.tau_d
 
-   h_inf = gate_inf(V, params.Vh_half, params.kh_slope) # kh_slope < 0 for Ih
-   dh = (h_inf - h) / params.tau_h
+    #-------- effective open probability --------
+    open_iGluR = A * D  # effective open probability
 
-   m_inf = gate_inf(V, params.Vm_half, params.km_slope) # CaL activation (instant-ish)
-   # if you want dynamic m, swap to a state variable; here we keep it simple
+    # Morris-Lecar activation functions
+    n_inf = gate_inf(V, params.Vn_half, params.kn_slope)
+    dn = (n_inf - n) / params.tau_n
 
-   # -------- currents --------
-   I_L     = params.g_L * (V - params.E_L)
-   I_Kv    = params.g_Kv * n * (V - params.E_K)
-   I_h     = params.g_h * h * (V - params.E_h)
-   I_CaL   = params.g_CaL * m_inf * (V - params.E_Ca)
-   # OFF synaptic current (nonselective cation, reversal ~0 mV)
-   I_iGluR = params.g_iGluR * open_iGluR * (V - params.E_iGluR)
+    h_inf = gate_inf(V, params.Vh_half, params.kh_slope) # kh_slope < 0 for Ih
+    dh = (h_inf - h) / params.tau_h
 
-       #-------- Ca pool --------
-   # driven by inward Ca current only (when I_CaL is negative)
-   Ca_in = max(-I_CaL, 0.0)
-   dc = (-c / params.tau_c) + params.k_c * Ca_in
+    m_inf = gate_inf(V, params.Vm_half, params.km_slope) # CaL activation (instant-ish)
+    # if you want dynamic m, swap to a state variable; here we keep it simple
 
-   # KCa activation from Ca pool
-   a_c = hill(max(c, 0.0), params.K_c, params.n_c)
-   I_KCa = params.g_KCa * a_c * (V - params.E_K)
-   
-   # -------- voltage derivative --------
-   dV = (-I_L - I_iGluR - I_Kv - I_h - I_CaL - I_KCa) / params.C_m
+    # -------- currents --------
+    I_L     = params.g_L * (V - params.E_L)
+    I_Kv    = params.g_Kv * n * (V - params.E_K)
+    I_h     = params.g_h * h * (V - params.E_h)
+    I_CaL   = params.g_CaL * m_inf * (V - params.E_Ca)
+    # OFF synaptic current (nonselective cation, reversal ~0 mV)
+    I_iGluR = params.g_iGluR * open_iGluR * (V - params.E_iGluR)
 
-   # -------- output glutamate release proxy (Ca-driven) --------
-   dY = (params.a_Release * R_inf(c, params.K_Release, params.n_Release) - Y) / params.tau_Release
+        #-------- Ca pool --------
+    # driven by inward Ca current only (when I_CaL is negative)
+    Ca_in = max(-I_CaL, 0.0)
+    dc = (-c / params.tau_c) + params.k_c * Ca_in
 
-   du .= (dV, dn, dh, dc, dA, dD, dY)
-   return nothing
+    # KCa activation from Ca pool
+    a_c = hill(max(c, 0.0), params.K_c, params.n_c)
+    I_KCa = params.g_KCa * a_c * (V - params.E_K)
+
+    # -------- voltage derivative --------
+    dV = (-I_L - I_iGluR - I_Kv - I_h - I_CaL - I_KCa) / params.C_m
+
+    # -------- output glutamate release proxy (Ca-driven) --------
+    dY = (params.a_Release * R_inf(c, params.K_Release, params.n_Release) - Y) / params.tau_Release
+
+    du .= (dV, dn, dh, dc, dA, dD, dY)
+    return nothing
 end
