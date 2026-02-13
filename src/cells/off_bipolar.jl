@@ -2,30 +2,10 @@
 # off_bipolar.jl - OFF-Bipolar cell dynamics
 # ============================================================
 
-# ── State indices ───────────────────────────────────────────
-
-const OFFBC_STATE_VARS = 4
-const OFFBC_V_INDEX = 1
-const OFFBC_W_INDEX = 2
-const OFFBC_S_GLU_INDEX = 3  # Ionotropic Glu gating
-const OFFBC_GLU_INDEX = 4
-
-# ── 1. Default Parameters ───────────────────────────────────
-
-"""
-    default_off_bc_params()
-
-Return default parameters for the OFF bipolar cell model as a named tuple.
-Parameters are loaded from off_bipolar_params.csv.
-"""
-function default_off_bc_params()
-    return default_off_bc_params_csv()
-end
-
 # ── 2. Initial Conditions ───────────────────────────────────
 
 """
-    off_bipolar_dark_state(params)
+    offbc_state(params)
 
 Return dark-adapted initial conditions for an OFF bipolar cell.
 
@@ -35,7 +15,7 @@ Return dark-adapted initial conditions for an OFF bipolar cell.
 # Returns
 - 7-element state vector [V, n, h, c, A, D, G]
 """
-function off_bipolar_dark_state(params)
+function offbc_state(params)
     V0 = -60.0
     n0 = gate_inf(V0, params.Vn_half, params.kn_slope)
     h0 = gate_inf(V0, params.Vh_half, params.kh_slope)
@@ -95,7 +75,7 @@ Morris-Lecar OFF bipolar cell model with ionotropic glutamate receptor.
 - `t`: time (ms)
 
 # State vector
-`u = [V, w, s_Glu, Glu_release]`
+`u = [V, n, h, c, A, D, Glu_release]`
 
 # Notes
 Ionotropic synapse: depolarizes when glutamate is high (dark),

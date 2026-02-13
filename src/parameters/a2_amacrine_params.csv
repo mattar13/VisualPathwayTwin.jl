@@ -1,17 +1,44 @@
 Key,Value,Description
-C_m,10.0,Membrane capacitance (pF)
-g_L,2.0,Leak conductance (nS)
-g_Ca,8.0,Ca conductance (nS)
-g_K,12.0,K conductance (nS)
-E_L,-60.0,Leak reversal potential (mV)
-E_Ca,120.0,Ca reversal potential (mV)
-E_K,-84.0,K reversal potential (mV)
-V1,-1.2,Ca activation midpoint (mV)
-V2,18.0,Ca activation slope (mV)
-V3,-10.0,K activation midpoint (mV)
-V4,12.0,K activation slope (mV)
-phi,0.2,Recovery time scale
-alpha_Gly,1.0,Max glycine release
-V_Gly_half,-20.0,Release half-activation (mV)
-V_Gly_slope,5.0,Release slope (mV)
-tau_Gly,4.0,Glycine clearance time (ms)
+C_m,30.0,Membrane capacitance (pF)
+g_L,1.0,Leak conductance (nS)
+E_L,-55.0,Leak reversal potential (mV)
+
+g_Kv,4.0,Delayed rectifier K conductance (nS)
+E_K,-85.0,Potassium reversal potential (mV)
+Vn_half,-30.0,Kv activation midpoint (mV)
+kn_slope,9.0,Kv activation slope (mV)
+tau_n,8.0,Kv activation time constant (ms)
+g_h,1.0,HCN (Ih) conductance (nS)
+E_h,-35.0,Ih reversal potential (mV)
+Vh_half,-80.0,Ih activation midpoint (mV)
+kh_slope,-8.0,Ih activation slope (negative = opens on hyperpolarization)
+tau_h,80.0,Ih activation time constant (ms)
+g_CaL,0.8,L-type Ca conductance (nS)
+E_Ca,60.0,Calcium reversal potential (mV, effective)
+Vm_half,-48.0,CaL activation midpoint (mV)
+km_slope,7.0,CaL activation slope (mV)
+tau_c,40.0,Intracellular Ca pool decay time constant (ms)
+k_c,0.005,Ca influx to pool scaling factor
+g_KCa,1.5,Ca-activated K conductance (nS)
+K_c,0.5,Ca half-activation for KCa channel (Ca pool units)
+n_c,2.0,Hill coefficient for Ca-activated K
+
+g_iGluR,12.0,Ionotropic glutamate receptor max conductance (nS)
+E_iGluR,0.0,iGluR reversal potential (mV; nonselective cation)
+
+K_a,0.7,Glutamate half-activation for OFF iGluR activation (same units as glu_received)
+n_a,2.0,Hill coefficient for OFF iGluR activation (steepness)
+a_a, 1.0, Activation scaling factor
+tau_A,2.0,iGluR activation time constant (ms)
+
+K_d,0.8,Glutamate half-activation for receptor desensitization (same units as glu_received)
+n_d,2.0,Hill coefficient for desensitization
+a_d,1.0,Recovery from desensitization scaling factor
+tau_d,50.0,Desensitization onset time constant (ms)
+
+K_Release,0.6,Ca half-activation for release (Ca pool units)
+n_Release,3.0,Hill coefficient for Ca-driven release
+a_Release,0.5,Scaling for Ca-driven glutamate release proxy
+tau_Release,5.0,Release proxy filtering / effective clearance time constant (ms)
+
+g_gap,1.0,Gap junction coupling conductance (nS)

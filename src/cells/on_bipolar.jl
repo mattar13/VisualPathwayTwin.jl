@@ -2,28 +2,6 @@
 # on_bipolar.jl - ON-Bipolar cell dynamics
 # ============================================================
 
-# ── State indices ───────────────────────────────────────────
-
-const ONBC_STATE_VARS = 6
-const ONBC_V_INDEX = 1
-const ONBC_W_INDEX = 2
-const ONBC_S_INDEX = 3  # mGluR6 state
-const ONBC_GLU_INDEX = 4
-const ONBC_CA_INDEX = 5
-const ONBC_GLU_INDEX = 6
-
-# ── 1. Default Parameters ───────────────────────────────────
-
-"""
-    default_on_bc_params()
-
-Return default parameters for the ON bipolar cell model as a named tuple.
-Parameters are loaded from on_bipolar_params.csv.
-"""
-function default_on_bc_params()
-    return default_on_bc_params_csv()
-end
-
 # ── 2. Initial Conditions ───────────────────────────────────
 
 """
@@ -37,7 +15,7 @@ Return dark-adapted initial conditions for an ON bipolar cell.
 # Returns
 - 6-element state vector [V, w, S_mGluR6, Glu_release, Ca, Glu]
 """
-function on_bipolar_dark_state(params)
+function onbc_state(params)
     V0 = -60.0
     n0 = gate_inf(V0, params.Vn_half, params.kn_slope)
     h0 = gate_inf(V0, params.Vh_half, params.kh_slope)
@@ -79,15 +57,15 @@ Release function for glutamate release from the ON bipolar cell.
 Morris-Lecar ON bipolar cell model with mGluR6 sign inversion.
 
 # Arguments
-- `du`: derivative vector (4 elements)
-- `u`: state vector (4 elements)
+- `du`: derivative vector (6 elements)
+- `u`: state vector (6 elements)
 - `p`: tuple `(params, glu_received)` where:
   - `params`: named tuple from `default_on_bc_params()` (includes mGluR6 parameters)
   - `glu_received`: glutamate concentration from photoreceptors (µM)
 - `t`: time (ms)
 
 # State vector
-`u = [V, w, S_mGluR6, Glu_release]`
+`u = [V, n, h, c, S_mGluR6, Glu_release]`
 
 # Notes
 The mGluR6 synapse inverts the glutamate signal: high Glu → cell hyperpolarized.

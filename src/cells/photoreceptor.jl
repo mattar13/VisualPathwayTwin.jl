@@ -2,47 +2,10 @@
 # photoreceptor.jl - Rod photoreceptor dynamics
 # ============================================================
 
-# ── State indices ───────────────────────────────────────────
-
-const ROD_STATE_VARS = 21
-const ROD_R_INDEX = 1
-const ROD_T_INDEX = 2
-const ROD_P_INDEX = 3
-const ROD_G_INDEX = 4
-const ROD_HC1_INDEX = 5
-const ROD_HC2_INDEX = 6
-const ROD_HO1_INDEX = 7
-const ROD_HO2_INDEX = 8
-const ROD_HO3_INDEX = 9
-const ROD_MKV_INDEX = 10
-const ROD_HKV_INDEX = 11
-const ROD_MCA_INDEX = 12
-const ROD_MKCA_INDEX = 13
-const ROD_CA_S_INDEX = 14
-const ROD_CA_F_INDEX = 15
-const ROD_CAB_LS_INDEX = 16
-const ROD_CAB_HS_INDEX = 17
-const ROD_CAB_LF_INDEX = 18
-const ROD_CAB_HF_INDEX = 19
-const ROD_V_INDEX = 20
-const ROD_GLU_INDEX = 21
-
-# ── 1. Default Parameters ───────────────────────────────────
-
-"""
-    default_rod_params()
-
-Return default parameters for the rod photoreceptor model as a named tuple.
-Parameters are loaded from photoreceptor_params.csv.
-"""
-function default_rod_params()
-    return default_rod_params_csv()
-end
-
 # ── 2. Initial Conditions ───────────────────────────────────
 
 """
-    rod_dark_state(params)
+    photoreceptor_state(params)
 
 Return dark-adapted initial conditions for a rod photoreceptor.
 
@@ -52,47 +15,35 @@ Return dark-adapted initial conditions for a rod photoreceptor.
 # Returns
 - 21-element state vector corresponding to dark-adapted equilibrium
 """
-function rod_dark_state(params)
-    u0 = zeros(ROD_STATE_VARS)
-
-    # Phototransduction cascade (dark = no activation)
-    u0[ROD_R_INDEX] = 0.0      # R
-    u0[ROD_T_INDEX] = 0.0      # T
-    u0[ROD_P_INDEX] = 0.0      # P
-    u0[ROD_G_INDEX] = 2.0      # G (cGMP)
-
-    # Ih gating states (5-state model)
-    u0[ROD_HC1_INDEX] = 0.5
-    u0[ROD_HC2_INDEX] = 0.3
-    u0[ROD_HO1_INDEX] = 0.1
-    u0[ROD_HO2_INDEX] = 0.05
-    u0[ROD_HO3_INDEX] = 0.05
-
-    # Channel gating variables
-    u0[ROD_MKV_INDEX] = 0.430  # mKv
-    u0[ROD_HKV_INDEX] = 0.999  # hKv
-    u0[ROD_MCA_INDEX] = 0.436  # mCa
-    u0[ROD_MKCA_INDEX] = 0.642 # mKCa
-
-    # Inner segment Ca dynamics
-    u0[ROD_CA_S_INDEX] = 0.0966   # Ca_s
-    u0[ROD_CA_F_INDEX] = 0.0966   # Ca_f
-    u0[ROD_CAB_LS_INDEX] = 80.929 # CaB_ls
-    u0[ROD_CAB_HS_INDEX] = 29.068 # CaB_hs
-    u0[ROD_CAB_LF_INDEX] = 80.929 # CaB_lf
-    u0[ROD_CAB_HF_INDEX] = 29.068 # CaB_hf
-
-    # Membrane potential
-    u0[ROD_V_INDEX] = -36.186     # V
+function photoreceptor_state(params)
+    R0 = 0.0
+    T0 = 0.0
+    P0 = 0.0
+    G0 = 2.0
+    HC10 = 0.5
+    HC20 = 0.3
+    HO10 = 0.1
+    HO20 = 0.05
+    HO30 = 0.05
+    mKv0 = 0.430
+    hKv0 = 0.999
+    mCa0 = 0.436
+    mKCa0 = 0.642
+    Ca_s0 = 0.0966
+    Ca_f0 = 0.0966
+    CaB_ls0 = 80.929
+    CaB_hs0 = 29.068
+    CaB_lf0 = 80.929
+    CaB_hf0 = 29.068
+    V0 = -36.186
 
     # Glutamate release (compute from dark voltage)
-    V_dark = u0[ROD_V_INDEX]
     V_Glu_half = params.V_Glu_half
     V_Glu_slope = params.V_Glu_slope
     alpha_Glu = params.alpha_Glu
-    u0[ROD_GLU_INDEX] = alpha_Glu / (1.0 + exp(-(V_dark - V_Glu_half) / V_Glu_slope))
+    Glu0 = alpha_Glu / (1.0 + exp(-(V0 - V_Glu_half) / V_Glu_slope))
 
-    return u0
+    return [R0, T0, P0, G0, HC10, HC20, HO10, HO20, HO30, mKv0, hKv0, mCa0, mKCa0, Ca_s0, Ca_f0, CaB_ls0, CaB_hs0, CaB_lf0, CaB_hf0, V0, Glu0]
 end
 
 # ── 3. Auxiliary Functions ──────────────────────────────────
@@ -185,94 +136,37 @@ Biophysical rod photoreceptor model with simplified phototransduction cascade,
 """
 function photoreceptor_model!(du, u, p, t)
     # Unpack parameters and stimulus info
-    params, stim_params = p
-
-    # Extract stimulus parameters
-    stim_start = stim_params.stim_start
-    stim_end = stim_params.stim_end
-    photon_flux = stim_params.photon_flux
+    params, stimulus_function = p
 
     # Decompose state vector using tuple unpacking
     R, T, P, G, HC1, HC2, HO1, HO2, HO3, mKv, hKv, mCa, mKCa,
         Ca_s, Ca_f, CaB_ls, CaB_hs, CaB_lf, CaB_hf, V, Glu = u
 
-    # Extract parameters (using non-Greek names from CSV)
-    aC = params.aC
-    kR1 = params.kR1
-    kF1 = params.kF1
-    kR2 = params.kR2
-    kR3 = params.kR3
-    kHYDRO = params.kHYRDO
-    kREC = params.kREC
-    G0 = params.G0
-    iDARK = params.iDARK
-    kg = params.kg #TODO: Figure out why this isn't used
-    C_m = params.C_m
-    gLEAK = params.gLEAK
-    eLEAK = params.ELEAK
-    gH = params.gH
-    eH = params.eH
-    gKV = params.gKV
-    eK = params.eK
-    gCa = params.gCa
-    eCa = params.eCa
-    Ca_0 = params._Ca_0
-    gKCa = params.gKCa
-    gCl = params.gCl
-    eCl = params.eCl
-    F = params.F
-    DCa = params.Dca
-    S1 = params.S1
-    DELTA = params.DELTA
-    V1 = params.V1
-    V2 = params.V2
-    Lb1 = params.Lb1
-    Bl = params.Bl
-    Lb2 = params.Lb2
-    Hb1 = params.Hb1
-    Bh = params.Bh
-    Hb2 = params.Hb2
-    J_ex = params.J_ex
-    Cae = params.Cae
-    K_ex = params.K_ex
-    J_ex2 = params.J_ex2
-    K_ex2 = params.K_ex2
-    alpha_Glu = params.alpha_Glu
-    V_Glu_half = params.V_Glu_half
-    V_Glu_slope = params.V_Glu_slope
-    tau_Glu = params.tau_Glu
-
     # ── Stimulus ──
-    Phi = Stim(t, stim_start, stim_end, photon_flux)
+    Phi = stimulus_function(t)
 
     # ── Reversal potentials ──
-    E_LEAK = -eLEAK
-    E_H = -eH
-    E_K = -eK
-    E_Cl = -eCl
-    E_Ca = eCa * log(Ca_0 / max(Ca_s, 1e-5))
+    E_LEAK = -params.ELEAK
+    E_H = -params.eH
+    E_K = -params.eK
+    E_Cl = -params.eCl
+    E_Ca = params.eCa * log(params._Ca_0 / max(Ca_s, 1e-5))
 
-    # ── Phototransduction cascade ──
-    R_tot = 3.0   # mM
-    T_tot = 0.3   # mM
-    P_tot = 0.021 # mM
-    lambda = 0.67 # quantum efficiency
-
-    dR = aC * lambda * Phi * (R_tot - R) - kR1 * R * (T_tot - T) - kF1 * R
-    dT = kR1 * R * (T_tot - T) - kR2 * T * (P_tot - P)
-    dP = kR2 * T * (P_tot - P) - kR3 * P
-    dG = -kHYDRO * P * G + kREC * (G0 - G)
+    dR = params.aC * params.lambda * Phi * (params.R_tot - R) - params.kR1 * R * (params.T_tot - T) - params.kF1 * R
+    dT = params.kR1 * R * (params.T_tot - T) - params.kR2 * T * (params.P_tot - P)
+    dP = params.kR2 * T * (params.P_tot - P) - params.kR3 * P
+    dG = -params.kHYDRO * P * G + params.kREC * (params.G0 - G)
 
     # ── Currents ──
-    iPHOTO = -iDARK * J∞(G, 10.0) * (1.0 - exp((V - 8.5) / 17.0))
-    iLEAK = gLEAK * (V - E_LEAK)
-    iH = gH * (HO1 + HO2 + HO3) * (V - E_H)
-    iKV = gKV * mKv^3 * hKv * (V - E_K)
-    iCa = gCa * mCa^4 * hCa(V) * (V - E_Ca)
-    iKCa = gKCa * mKCa^2 * mKCas(Ca_s) * (V - E_K)
-    iCl = gCl * mCl(Ca_s) * (V - E_Cl)
-    iEX = J_ex * C∞(Ca_s, Cae, K_ex) * exp(-(V + 14) / 70)
-    iEX2 = J_ex2 * C∞(Ca_s, Cae, K_ex2)
+    iPHOTO = -params.iDARK * J∞(G, 10.0) * (1.0 - exp((V - 8.5) / 17.0))
+    iLEAK = params.gLEAK * (V - E_LEAK)
+    iH = params.gH * (HO1 + HO2 + HO3) * (V - E_H)
+    iKV = params.gKV * mKv^3 * hKv * (V - E_K)
+    iCa = params.gCa * mCa^4 * hCa(V) * (V - E_Ca)
+    iKCa = params.gKCa * mKCa^2 * mKCas(Ca_s) * (V - E_K)
+    iCl = params.gCl * mCl(Ca_s) * (V - E_Cl)
+    iEX = params.J_ex * C∞(Ca_s, params.Cae, params.K_ex) * exp(-(V + 14) / 70)
+    iEX2 = params.J_ex2 * C∞(Ca_s, params.Cae, params.K_ex2)
 
     # ── Hyperpolarization-activated current (Ih) gating ──
     H_vec = [HC1, HC2, HO1, HO2, HO3]
@@ -290,29 +184,29 @@ function photoreceptor_model!(du, u, p, t)
     dmKCa = αmKCa(V) * (1 - mKCa) - βmKCa(V) * mKCa
 
     # ── Calcium dynamics ──
-    Ca_flux = -(iCa + iEX + iEX2) / (2F * V1) * 1e-6
-    diffusion_s = DCa * (S1 / (DELTA * V1)) * (Ca_s - Ca_f)
-    diffusion_f = DCa * (S1 / (DELTA * V2)) * (Ca_s - Ca_f)
+    Ca_flux = -(iCa + iEX + iEX2) / (2* params.F * params.V1) * 1e-6
+    diffusion_s = params.DCa * (params.S1 / (params.DELTA * params.V1)) * (Ca_s - Ca_f)
+    diffusion_f = params.DCa * (params.S1 / (params.DELTA * params.V2)) * (Ca_s - Ca_f)
 
     dCa_s = Ca_flux - diffusion_s -
-            Lb1 * Ca_s * (Bl - CaB_ls) + Lb2 * CaB_ls -
-            Hb1 * Ca_s * (Bh - CaB_hs) + Hb2 * CaB_hs
+            params.Lb1 * Ca_s * (params.Bl - CaB_ls) + params.Lb2 * CaB_ls -
+            params.Hb1 * Ca_s * (params.Bh - CaB_hs) + params.Hb2 * CaB_hs
 
     dCa_f = diffusion_f -
-            Lb1 * Ca_f * (Bl - CaB_lf) + Lb2 * CaB_lf -
-            Hb1 * Ca_f * (Bh - CaB_hf) + Hb2 * CaB_hf
+            params.Lb1 * Ca_f * (params.Bl - CaB_lf) + params.Lb2 * CaB_lf -
+            params.Hb1 * Ca_f * (params.Bh - CaB_hf) + params.Hb2 * CaB_hf
 
-    dCaB_ls = Lb1 * Ca_s * (Bl - CaB_ls) - Lb2 * CaB_ls
-    dCaB_hs = Hb1 * Ca_s * (Bh - CaB_hs) - Hb2 * CaB_hs
-    dCaB_lf = Lb1 * Ca_f * (Bl - CaB_lf) - Lb2 * CaB_lf
-    dCaB_hf = Hb1 * Ca_f * (Bh - CaB_hf) - Hb2 * CaB_hf
+    dCaB_ls = params.Lb1 * Ca_s * (params.Bl - CaB_ls) - params.Lb2 * CaB_ls
+    dCaB_hs = params.Hb1 * Ca_s * (params.Bh - CaB_hs) - params.Hb2 * CaB_hs
+    dCaB_lf = params.Lb1 * Ca_f * (params.Bl - CaB_lf) - params.Lb2 * CaB_lf
+    dCaB_hf = params.Hb1 * Ca_f * (params.Bh - CaB_hf) - params.Hb2 * CaB_hf
 
     # ── Voltage ──
-    dV = -(iPHOTO + iLEAK + iH + iCa + iCl + iKCa + iKV + iEX + iEX2) / C_m
+    dV = -(iPHOTO + iLEAK + iH + iCa + iCl + iKCa + iKV + iEX + iEX2) / params.C_m
 
     # ── Glutamate release dynamics (voltage-dependent) ──
-    R_glu_inf = alpha_Glu / (1.0 + exp(-(V - V_Glu_half) / V_Glu_slope))
-    dGlu = (R_glu_inf - Glu) / tau_Glu
+    R_glu_inf = params.alpha_Glu / (1.0 + exp(-(V - params.V_Glu_half) / params.V_Glu_slope))
+    dGlu = (R_glu_inf - Glu) / params.tau_Glu
 
     # ── Assign all derivatives to du ──
     du .= [dR, dT, dP, dG, dHC1, dHC2, dHO1, dHO2, dHO3,

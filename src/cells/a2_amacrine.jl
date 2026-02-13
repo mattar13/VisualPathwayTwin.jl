@@ -2,25 +2,6 @@
 # a2_amacrine.jl - A2 (AII) Amacrine cell dynamics
 # ============================================================
 
-# ── State indices ───────────────────────────────────────────
-
-const A2_STATE_VARS = 3
-const A2_V_INDEX = 1
-const A2_W_INDEX = 2
-const A2_GLY_INDEX = 3
-
-# ── 1. Default Parameters ───────────────────────────────────
-
-"""
-    default_a2_params()
-
-Return default parameters for the A2 amacrine cell model as a named tuple.
-Parameters are loaded from a2_amacrine_params.csv.
-"""
-function default_a2_params()
-    return default_a2_params_csv()
-end
-
 # ── 2. Initial Conditions ───────────────────────────────────
 
 """
@@ -32,21 +13,40 @@ Return dark-adapted initial conditions for an A2 amacrine cell.
 - `params`: named tuple from `default_a2_params()`
 
 # Returns
-- 3-element state vector [V, w, Gly]
+- 7-element state vector [V, n, h, c, A, D, Y]
 """
-function a2_dark_state(params)
-    u0 = zeros(A2_STATE_VARS)
-    u0[A2_V_INDEX] = -60.0      # Resting potential
-    u0[A2_W_INDEX] = 0.01       # Small recovery variable
-    u0[A2_GLY_INDEX] = 0.0      # No glycine release at rest
-    return u0
+function a2_state(params)
+    V0 = -60.0
+    n0 = gate_inf(V0, params.Vn_half, params.kn_slope)
+    h0 = gate_inf(V0, params.Vh_half, params.kh_slope)
+    c0 = 0.0
+    A0 = 0.0
+    D0 = 0.0
+    Y0 = 0.0
+    return [V0, n0, h0, c0, A0, D0, Y0]
 end
 
 # ── 3. Auxiliary Functions ──────────────────────────────────
 
-# Use shared ML functions from horizontal.jl
-# m_inf_ml(V, V1, V2), w_inf_ml(V, V3, V4), tau_w_ml(V, V3, V4)
+#Defined in off_bipolar.jl
 
+# """
+# OFF ionotropic receptor activation function
+# """
+# @inline function A_inf(glu, K, n)
+#     # Increasing Hill: more glutamate -> more activation (OFF pathway)
+#     return hill(max(glu, 0.0), K, n)
+# end
+
+# """
+# OFF ionotropic receptor desensitization function
+# """
+# @inline function D_inf(glu, K, n)
+#     # Fraction available (NOT desensitized).
+#     # More glutamate -> more desensitization -> less availability.
+#     # 1 / (1 + (glu/K)^n)
+#     return 1.0 / (1.0 + (max(glu, 0.0) / K)^n)
+# end
 # ── 4. Mathematical Model ───────────────────────────────────
 
 """
@@ -55,8 +55,8 @@ end
 Morris-Lecar A2 (AII) amacrine cell model.
 
 # Arguments
-- `du`: derivative vector (3 elements)
-- `u`: state vector (3 elements)
+- `du`: derivative vector (7 elements)
+- `u`: state vector (7 elements)
 - `p`: tuple `(params, I_exc, I_inh, I_mod)` where:
   - `params`: named tuple from `default_a2_params()`
   - `I_exc`: excitatory synaptic current from bipolars (pA)
@@ -65,58 +65,65 @@ Morris-Lecar A2 (AII) amacrine cell model.
 - `t`: time (ms)
 
 # State vector
-`u = [V, w, Gly]`
+`u = [V, n, h, c, A, D, Y]`
 
 # Notes
 Critical for oscillatory potential generation. Fast ML dynamics
 (low C_m, high phi) enable high-frequency oscillations.
 """
 function a2_model!(du, u, p, t)
-    params, I_exc, I_inh, I_mod = p
+    params, glu_received = p
 
-    # Decompose state vector using tuple unpacking
-    V, w, Gly = u
+   # Decompose state vector using tuple unpacking
+   V, n, h, c, A, D, Y = u
 
-    # Extract Morris-Lecar parameters
-    C_m = params.C_m
-    g_L = params.g_L
-    g_Ca = params.g_Ca
-    g_K = params.g_K
-    E_L = params.E_L
-    E_Ca = params.E_Ca
-    E_K = params.E_K
-    V1 = params.V1
-    V2 = params.V2
-    V3 = params.V3
-    V4 = params.V4
-    phi = params.phi
+   # -------- OFF ionotropic receptor (AMPA/KAR-like) --------
+   A_INF = A_inf(glu_received, params.K_a, params.n_a)
+   dA = (params.a_a * A_INF - A) / params.tau_A
+   
+   # -------- desensitization --------
+   # Desensitization (optional but recommended for realistic OFF kinetics)
+   # If you don't want desensitization, set D=1 always by:
+   #   D = 1.0, dD = 0.0, or set tau_des huge and tau_rec small.
+   D_INF = D_inf(glu_received, params.K_d, params.n_d)
+   dD = (params.a_d * D_INF - D) / params.tau_d
+   
+   #-------- effective open probability --------
+   open_iGluR = A * D  # effective open probability
 
-    # Extract glycine release parameters
-    alpha_Gly = params.alpha_Gly
-    V_Gly_half = params.V_Gly_half
-    V_Gly_slope = params.V_Gly_slope
-    tau_Gly = params.tau_Gly
+   # Morris-Lecar activation functions
+   n_inf = gate_inf(V, params.Vn_half, params.kn_slope)
+   dn = (n_inf - n) / params.tau_n
 
-    # Morris-Lecar activation functions
-    m_inf = m_inf_ml(V, V1, V2)
-    w_inf = w_inf_ml(V, V3, V4)
-    tau_w = tau_w_ml(V, V3, V4)
+   h_inf = gate_inf(V, params.Vh_half, params.kh_slope) # kh_slope < 0 for Ih
+   dh = (h_inf - h) / params.tau_h
 
-    # Membrane currents
-    I_L = g_L * (V - E_L)
-    I_Ca = g_Ca * m_inf * (V - E_Ca)
-    I_K = g_K * w * (V - E_K)
+   m_inf = gate_inf(V, params.Vm_half, params.km_slope) # CaL activation (instant-ish)
+   # if you want dynamic m, swap to a state variable; here we keep it simple
 
-    # Derivatives
-    dV = (-I_L - I_Ca - I_K + I_exc + I_inh + I_mod) / C_m
-    dw = phi * (w_inf - w) / max(tau_w, 0.1)
+   # -------- currents --------
+   I_L     = params.g_L * (V - params.E_L)
+   I_Kv    = params.g_Kv * n * (V - params.E_K)
+   I_h     = params.g_h * h * (V - params.E_h)
+   I_CaL   = params.g_CaL * m_inf * (V - params.E_Ca)
+   # OFF synaptic current (nonselective cation, reversal ~0 mV)
+   I_iGluR = params.g_iGluR * open_iGluR * (V - params.E_iGluR)
 
-    # Glycine release (fast, critical for OP frequency)
-    T_inf = 1.0 / (1.0 + exp(-(V - V_Gly_half) / V_Gly_slope))
-    dGly = (alpha_Gly * T_inf - Gly) / tau_Gly
+       #-------- Ca pool --------
+   # driven by inward Ca current only (when I_CaL is negative)
+   Ca_in = max(-I_CaL, 0.0)
+   dc = (-c / params.tau_c) + params.k_c * Ca_in
 
-    # Assign derivatives
-    du .= [dV, dw, dGly]
+   # KCa activation from Ca pool
+   a_c = hill(max(c, 0.0), params.K_c, params.n_c)
+   I_KCa = params.g_KCa * a_c * (V - params.E_K)
+   
+   # -------- voltage derivative --------
+   dV = (-I_L - I_iGluR - I_Kv - I_h - I_CaL - I_KCa) / params.C_m
 
-    return nothing
+   # -------- output glutamate release proxy (Ca-driven) --------
+   dY = (params.a_Release * R_inf(c, params.K_Release, params.n_Release) - Y) / params.tau_Release
+
+   du .= (dV, dn, dh, dc, dA, dD, dY)
+   return nothing
 end
